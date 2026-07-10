@@ -1,14 +1,18 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, Flame, NotebookPen, Ruler, Sprout } from "lucide-react";
+import { Bean, CalendarDays, Dna, Flame, NotebookPen, Ruler, Sprout } from "lucide-react";
 import PixelSprite from "../pixel/PixelSprite.jsx";
+import PixelBee from "../components/PixelBee.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
-import { STAGES } from "../game/constants.js";
-import { daysOld, growth, latestHeight } from "../game/engine.js";
+import { DAY, STAGES } from "../game/constants.js";
+import { daysOld, growth, latestHeight, parentageOptions } from "../game/engine.js";
 
 export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) {
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState("");
   const [logHeight, setLogHeight] = useState("");
+  const [seedsOpen, setSeedsOpen] = useState(false);
+  const [seedQty, setSeedQty] = useState(10);
+  const [seedParentage, setSeedParentage] = useState("self");
 
   const plant = useMemo(
     () => state.plants.find((p) => p.id === state.activePlantId) || state.plants[0],
@@ -33,6 +37,14 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
   const age = daysOld(plant);
   const height = latestHeight(plant);
   const measurements = plant.logs.filter((e) => e.height != null).length;
+  const crosses = state.crosses || [];
+  const plantCrosses = crosses.filter(
+    (c) => c.motherId === plant.id || c.fatherId === plant.id
+  );
+  const recentCross = plantCrosses.some((c) => Date.now() - c.date < 30 * DAY);
+  const showBee = g.stageIndex === 3 || recentCross;
+  const seedOpts = parentageOptions(plant, crosses);
+  const chosenOpt = seedOpts.find((o) => o.key === seedParentage) || seedOpts[0];
 
   const saveLog = () => {
     if (!logText.trim() && !logHeight) return notify("Add a note or height first!");
@@ -77,12 +89,13 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
             </span>
           </div>
 
-          <div className="flex justify-center py-2">
+          <div className="flex justify-center py-2 relative">
             <PixelSprite
               stageIndex={g.stageIndex}
               variety={plant.variety}
               size={Math.min(216, Math.round(window.innerWidth * 0.56))}
             />
+            {showBee && <PixelBee className="left-[16%] top-[38%]" />}
           </div>
 
           {/* slow automatic growth toward the next stage */}
@@ -150,17 +163,63 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
             )}
           </div>
         </div>
-        <div className="p-3 flex gap-3 border-t-2 border-bark-edge">
+        <div className="p-3 flex gap-2 border-t-2 border-bark-edge">
           <PixelButton variant="ghost" className="flex-1" onClick={() => setLogOpen(true)}>
-            <Ruler size={11} className="inline -mt-0.5 mr-1.5" />
+            <Ruler size={11} className="inline -mt-0.5 mr-1" />
             MEASURE
           </PixelButton>
           <PixelButton variant="ghost" className="flex-1" onClick={() => setLogOpen(true)}>
-            <NotebookPen size={11} className="inline -mt-0.5 mr-1.5" />
-            ADD NOTE
+            <NotebookPen size={11} className="inline -mt-0.5 mr-1" />
+            NOTE
+          </PixelButton>
+          <PixelButton
+            variant="ghost"
+            className="flex-1"
+            onClick={() => {
+              setSeedParentage(seedOpts[0].key);
+              setSeedQty(10);
+              setSeedsOpen(true);
+            }}
+          >
+            <Bean size={11} className="inline -mt-0.5 mr-1" />
+            SAVE SEEDS
           </PixelButton>
         </div>
       </div>
+
+      {/* breeding record */}
+      {(plant.gen >= 1 || plantCrosses.length > 0) && (
+        <div className="mx-2 mt-6 bg-bark-card border-2 border-bark-edge p-3">
+          <h3 className="font-pixel text-[9px] text-orchid tracking-wider mb-2">
+            <Dna size={12} className="inline -mt-0.5 mr-1.5" aria-hidden />
+            BREEDING
+          </h3>
+          {plant.gen >= 1 && (
+            <div className="font-lcd text-xl mb-1">
+              <span className="font-pixel text-[8px] px-1.5 py-0.5 bg-orchid text-bark border-2 border-bark-deep mr-2">
+                F{plant.gen}
+              </span>
+              hybrid · {plant.variety}
+            </div>
+          )}
+          {plantCrosses.map((c) => (
+            <div key={c.id} className="font-lcd text-lg text-bone/70 leading-snug">
+              🐝 {new Date(c.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}:{" "}
+              {c.motherId === plant.id
+                ? `pod parent × ${c.fatherName} (${c.fatherVariety})`
+                : `pollen donor for ${c.motherName} (${c.motherVariety})`}
+              {" · "}
+              {c.method === "hand" ? "hand-pollinated" : "open pollination"}
+              {c.note && ` · ${c.note}`}
+            </div>
+          ))}
+          {plant.gen >= 1 && (
+            <p className="font-lcd text-lg text-bone/50 mt-1">
+              Seeds saved from this plant will be F{plant.gen + 1}.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* journal */}
       <div className="mx-2 mt-6">
@@ -179,6 +238,57 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
           ))}
         </ul>
       </div>
+
+      {seedsOpen && (
+        <Modal title="SAVE SEEDS" onClose={() => setSeedsOpen(false)}>
+          <Field label="Seed parentage">
+            <select
+              className={inputCls}
+              value={seedParentage}
+              onChange={(e) => setSeedParentage(e.target.value)}
+            >
+              {seedOpts.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.gen ? `F${o.gen}: ` : ""}{o.label} — {o.desc}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="How many seeds?">
+            <input
+              type="number"
+              min="1"
+              className={inputCls}
+              value={seedQty}
+              onChange={(e) => setSeedQty(e.target.value)}
+            />
+          </Field>
+          <p className="font-lcd text-lg text-bone/60 mb-3">
+            A new packet goes into the vault:{" "}
+            <b className="text-sun">
+              {chosenOpt.gen ? `F${chosenOpt.gen} ` : ""}{chosenOpt.label}
+            </b>{" "}
+            · saved from {plant.name} · {new Date().getFullYear()}
+          </p>
+          <PixelButton
+            className="w-full"
+            onClick={() => {
+              const qty = Math.max(1, parseInt(seedQty, 10) || 1);
+              dispatch({
+                type: "SAVE_SEEDS",
+                plantId: plant.id,
+                qty,
+                label: chosenOpt.label,
+                gen: chosenOpt.gen,
+              });
+              setSeedsOpen(false);
+              notify(`🌰 ${qty} seeds banked in the vault!`);
+            }}
+          >
+            🌰 BANK THE SEEDS
+          </PixelButton>
+        </Modal>
+      )}
 
       {logOpen && (
         <Modal title="JOURNAL ENTRY" onClose={() => setLogOpen(false)}>

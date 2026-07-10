@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, Pencil, Plus, Ruler, Sprout, Trash2 } from "lucide-react";
+import { CalendarDays, Dna, Pencil, Plus, Ruler, Sprout, Trash2 } from "lucide-react";
 import PixelSprite from "../pixel/PixelSprite.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
@@ -11,6 +11,7 @@ const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0, notes: ""
 export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
   const [form, setForm] = useState(null); // null | {id?, ...emptyForm}
   const [toDelete, setToDelete] = useState(null);
+  const [crossForm, setCrossForm] = useState(null); // {motherId, fatherId, method, note}
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target ? e.target.value : e }));
 
@@ -75,10 +76,28 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
         <h2 className="font-pixel text-[11px] text-foliage-neon tracking-wide">
           MY PLANTS ({state.plants.length})
         </h2>
-        <PixelButton onClick={openNew}>
-          <Plus size={11} className="inline -mt-0.5 mr-1" />
-          ADD
-        </PixelButton>
+        <div className="flex gap-2">
+          {state.plants.length >= 2 && (
+            <PixelButton
+              variant="ghost"
+              onClick={() =>
+                setCrossForm({
+                  motherId: state.plants[0].id,
+                  fatherId: state.plants[1].id,
+                  method: "hand",
+                  note: "",
+                })
+              }
+            >
+              <Dna size={11} className="inline -mt-0.5 mr-1" />
+              CROSS
+            </PixelButton>
+          )}
+          <PixelButton onClick={openNew}>
+            <Plus size={11} className="inline -mt-0.5 mr-1" />
+            ADD
+          </PixelButton>
+        </div>
       </div>
 
       {state.plants.length === 0 && (
@@ -105,7 +124,14 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
               </button>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-pixel text-[9px] truncate">{p.name.toUpperCase()}</span>
+                  <span className="font-pixel text-[9px] truncate">
+                    {p.gen >= 1 && (
+                      <span className="px-1 py-0.5 bg-orchid text-bark border border-bark-deep mr-1.5 text-[7px]">
+                        F{p.gen}
+                      </span>
+                    )}
+                    {p.name.toUpperCase()}
+                  </span>
                   <span className="font-pixel text-[7px] px-1.5 py-1 border-2 border-bark-deep bg-lcd text-foliage-neon tracking-wider shrink-0">
                     {g.stage.label.toUpperCase()}
                   </span>
@@ -150,6 +176,67 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
           onConfirm={() => remove(toDelete)}
           onCancel={() => setToDelete(null)}
         />
+      )}
+
+      {crossForm && (
+        <Modal title="🐝 NEW CROSS" onClose={() => setCrossForm(null)}>
+          <p className="font-lcd text-lg text-bone/60 mb-3">
+            Record a real pollination between two of your plants. Seeds you
+            later save from the pod parent can be banked as F1 hybrids.
+          </p>
+          <Field label="Pod parent (mother — grows the crossed pods)">
+            <select
+              className={inputCls}
+              value={crossForm.motherId}
+              onChange={(e) => setCrossForm((f) => ({ ...f, motherId: e.target.value }))}
+            >
+              {state.plants.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} — {p.variety}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Pollen donor (father)">
+            <select
+              className={inputCls}
+              value={crossForm.fatherId}
+              onChange={(e) => setCrossForm((f) => ({ ...f, fatherId: e.target.value }))}
+            >
+              {state.plants.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} — {p.variety}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Method">
+            <select
+              className={inputCls}
+              value={crossForm.method}
+              onChange={(e) => setCrossForm((f) => ({ ...f, method: e.target.value }))}
+            >
+              <option value="hand">Hand-pollinated (bagged flower)</option>
+              <option value="open">Open pollination (plants side by side)</option>
+            </select>
+          </Field>
+          <Field label="Note (which flower, truss, date bagged…)">
+            <input
+              className={inputCls}
+              value={crossForm.note}
+              onChange={(e) => setCrossForm((f) => ({ ...f, note: e.target.value }))}
+              placeholder="3rd truss, bagged after brushing"
+            />
+          </Field>
+          <PixelButton
+            className="w-full mt-1"
+            onClick={() => {
+              if (crossForm.motherId === crossForm.fatherId)
+                return notify("Pick two different plants!");
+              dispatch({ type: "ADD_CROSS", ...crossForm });
+              setCrossForm(null);
+              notify("🐝 Cross recorded — good luck!");
+            }}
+          >
+            🐝 RECORD CROSS
+          </PixelButton>
+        </Modal>
       )}
 
       {form && (

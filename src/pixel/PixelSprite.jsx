@@ -2,7 +2,7 @@
 // The pod shape and color come from the plant's variety name, so a
 // habanero grows orange lanterns and a reaper grows gnarly pods.
 import { useMemo } from "react";
-import { GRID, getPodStyle, getStageSprites, rowSpans } from "./sprites.js";
+import { GRID, getStageSprites, rowSpans } from "./sprites.js";
 
 export default function PixelSprite({
   stageIndex = 0,
@@ -12,7 +12,7 @@ export default function PixelSprite({
   className = "",
 }) {
   const rects = useMemo(() => {
-    const grids = getStageSprites(getPodStyle(variety));
+    const grids = getStageSprites(variety);
     const grid = grids[Math.min(stageIndex, grids.length - 1)];
     const out = [];
     grid.forEach((row, y) => {

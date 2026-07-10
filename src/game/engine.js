@@ -51,13 +51,14 @@ export function latestHeight(plant) {
 
 /* ---------- factories ---------- */
 
-export function createPlant({ name, variety, plantedAt, stageIndex = 0, notes }) {
+export function createPlant({ name, variety, plantedAt, stageIndex = 0, notes, gen = 0 }) {
   const now = Date.now();
   return {
     id: uid(),
     name: name.trim(),
     variety: (variety || "Mystery Pepper").trim(),
     notes: (notes || "").trim(),
+    gen, // 0 = true-to-type, 1 = F1 hybrid, 2 = F2, ...
     plantedAt: plantedAt || now,
     stageIndex,
     stageChangedAt: now,
@@ -65,7 +66,7 @@ export function createPlant({ name, variety, plantedAt, stageIndex = 0, notes })
   };
 }
 
-export function createSeed({ variety, source, year, qty, heat }) {
+export function createSeed({ variety, source, year, qty, heat, gen = 0 }) {
   return {
     id: uid(),
     variety: variety.trim(),
@@ -73,8 +74,42 @@ export function createSeed({ variety, source, year, qty, heat }) {
     year: year || new Date().getFullYear(),
     qty: Math.max(0, qty | 0),
     heat: clamp(heat | 0, 1, 5),
+    gen,
     addedAt: Date.now(),
   };
+}
+
+/* ---------- breeding ---------- */
+
+// Seed-saving options for a plant: true-to-type (or next hybrid
+// generation), plus an F1 option for every cross it mothered.
+export function parentageOptions(plant, crosses = []) {
+  const opts = [];
+  if (plant.gen >= 1) {
+    opts.push({
+      key: "self",
+      label: plant.variety,
+      gen: plant.gen + 1,
+      desc: `F${plant.gen + 1} — next generation of this hybrid`,
+    });
+  } else {
+    opts.push({
+      key: "self",
+      label: plant.variety,
+      gen: 0,
+      desc: "true to type (no cross)",
+    });
+  }
+  for (const c of crosses) {
+    if (c.motherId !== plant.id) continue;
+    opts.push({
+      key: c.id,
+      label: `${c.motherVariety} × ${c.fatherVariety}`,
+      gen: 1,
+      desc: `F1 — crossed ${new Date(c.date).toLocaleDateString()}`,
+    });
+  }
+  return opts;
 }
 
 function addLog(plant, entry) {
@@ -84,6 +119,7 @@ function addLog(plant, entry) {
 export const initialState = {
   plants: [],
   seeds: [],
+  crosses: [],
   activePlantId: null,
   lastSavedTimestamp: Date.now(),
 };
@@ -164,12 +200,60 @@ export function reducer(state, action) {
     case "DELETE_SEED":
       return { ...state, seeds: state.seeds.filter((s) => s.id !== action.seedId) };
 
+    case "ADD_CROSS": {
+      const mother = state.plants.find((p) => p.id === action.motherId);
+      const father = state.plants.find((p) => p.id === action.fatherId);
+      if (!mother || !father || mother.id === father.id) return state;
+      const cross = {
+        id: uid(),
+        motherId: mother.id,
+        fatherId: father.id,
+        motherName: mother.name,
+        motherVariety: mother.variety,
+        fatherName: father.name,
+        fatherVariety: father.variety,
+        method: action.method || "hand",
+        note: (action.note || "").trim(),
+        date: now,
+      };
+      const methodText =
+        cross.method === "hand" ? "hand-pollinated" : "open pollination";
+      let next = { ...state, crosses: [cross, ...(state.crosses || [])] };
+      next = mapPlant(next, mother.id, (p) =>
+        addLog(p, { ts: now, text: `🐝 Crossed with ${father.name} (${father.variety}) — pod parent, ${methodText}` })
+      );
+      next = mapPlant(next, father.id, (p) =>
+        addLog(p, { ts: now, text: `🐝 Pollen donor for ${mother.name} (${mother.variety}) — ${methodText}` })
+      );
+      return next;
+    }
+
+    case "SAVE_SEEDS": {
+      const plant = state.plants.find((p) => p.id === action.plantId);
+      if (!plant || !action.qty) return state;
+      const seed = createSeed({
+        variety: action.label,
+        source: `saved from ${plant.name}`,
+        year: new Date(now).getFullYear(),
+        qty: action.qty,
+        heat: 3,
+        gen: action.gen || 0,
+      });
+      const genTag = seed.gen ? ` (F${seed.gen})` : "";
+      return mapPlant(
+        { ...state, seeds: [seed, ...state.seeds] },
+        plant.id,
+        (p) => addLog(p, { ts: now, text: `🌰 Saved ${seed.qty} seeds — ${seed.variety}${genTag}` })
+      );
+    }
+
     case "GERMINATE": {
       const seed = state.seeds.find((s) => s.id === action.seedId);
       if (!seed || seed.qty <= 0) return state;
       const plant = createPlant({
         name: action.name || seed.variety,
         variety: seed.variety,
+        gen: seed.gen || 0,
       });
       return {
         ...state,

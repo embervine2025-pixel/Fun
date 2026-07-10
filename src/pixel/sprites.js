@@ -156,6 +156,18 @@ export function getPodStyle(variety = "") {
   return "slim";
 }
 
+// Hybrids are written "Mother × Father" (or "... x ...") — a hybrid
+// plant grows BOTH parents' pods side by side.
+export function getPodStyles(variety = "") {
+  const parts = variety.split(/\s+[x×]\s+|×/i).filter((p) => p.trim());
+  if (parts.length >= 2) {
+    const a = getPodStyle(parts[0]);
+    const b = getPodStyle(parts[1]);
+    return a === b ? [a] : [a, b];
+  }
+  return [getPodStyle(variety)];
+}
+
 /* ---------------- shared ground: soil + pot ---------------- */
 
 function ground(g) {
@@ -207,7 +219,8 @@ function floweringStage(g) {
   stamp(g, 21, 18, BLOSSOM);
 }
 
-function fruitingStage(g, pods) {
+// podsAt(i): hybrids alternate between the two parents' pod styles.
+function fruitingStage(g, podsAt) {
   stem(g, 9);
   stamp(g, 17, 9, LEAF_SMALL);
   stamp(g, 10, 9, LEAF_SMALL, true);
@@ -218,12 +231,12 @@ function fruitingStage(g, pods) {
   g[8][16] = "L";
   stamp(g, 22, 9, BLOSSOM);
   // young pods, mostly still green — one just ripening
-  stamp(g, 21, 15, recolor(pods.ripe, TO_GREEN));
-  stamp(g, 9, 17, recolor(pods.ripe, TO_GREEN), true);
-  stamp(g, 18, 19, pods.ripe);
+  stamp(g, 21, 15, recolor(podsAt(0).ripe, TO_GREEN));
+  stamp(g, 9, 17, recolor(podsAt(1).ripe, TO_GREEN), true);
+  stamp(g, 18, 19, podsAt(0).ripe);
 }
 
-function harvestStage(g, pods) {
+function harvestStage(g, podsAt) {
   stem(g, 7);
   stamp(g, 17, 7, LEAF_SMALL);
   stamp(g, 10, 7, LEAF_SMALL, true);
@@ -233,25 +246,26 @@ function harvestStage(g, pods) {
   stamp(g, 8, 16, LEAF_BIG, true);
   stamp(g, 17, 18, LEAF_SMALL);
   g[6][16] = "L";
-  // loaded with ripe pods (alt shade for variety within the plant)
-  stamp(g, 22, 11, pods.ripe);
-  stamp(g, 6, 13, pods.ripe, true);
-  stamp(g, 21, 17, pods.alt);
-  stamp(g, 9, 19, pods.ripe, true);
-  stamp(g, 13, 20, pods.alt);
+  // loaded with ripe pods (hybrids show both parents' pods)
+  stamp(g, 22, 11, podsAt(0).ripe);
+  stamp(g, 6, 13, podsAt(1).ripe, true);
+  stamp(g, 21, 17, podsAt(0).alt);
+  stamp(g, 9, 19, podsAt(1).ripe, true);
+  stamp(g, 13, 20, podsAt(0).alt);
 }
 
 /* ---------------- build + cache + export ---------------- */
 
-function buildSet(styleKey) {
-  const pods = POD_STYLES[styleKey] || POD_STYLES.slim;
+function buildSet(styleKeys) {
+  const list = styleKeys.map((k) => POD_STYLES[k] || POD_STYLES.slim);
+  const podsAt = (i) => list[i % list.length];
   const builders = [
     seedStage,
     sproutStage,
     vegetativeStage,
     floweringStage,
-    (g) => fruitingStage(g, pods),
-    (g) => harvestStage(g, pods),
+    (g) => fruitingStage(g, podsAt),
+    (g) => harvestStage(g, podsAt),
   ];
   return builders.map((build) => {
     let g = blank();
@@ -263,9 +277,11 @@ function buildSet(styleKey) {
 }
 
 const cache = new Map();
-export function getStageSprites(styleKey = "slim") {
-  if (!cache.has(styleKey)) cache.set(styleKey, buildSet(styleKey));
-  return cache.get(styleKey);
+export function getStageSprites(variety = "") {
+  const styles = getPodStyles(variety);
+  const key = styles.join("+");
+  if (!cache.has(key)) cache.set(key, buildSet(styles));
+  return cache.get(key);
 }
 
 // Run-length-merge a grid row into [x, width, color] spans.

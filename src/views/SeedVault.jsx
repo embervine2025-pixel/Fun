@@ -85,7 +85,14 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
             <div className="p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-pixel text-[9px] truncate">{s.variety.toUpperCase()}</div>
+                  <div className="font-pixel text-[9px] truncate">
+                    {s.gen >= 1 && (
+                      <span className="px-1 py-0.5 bg-orchid text-bark border border-bark-deep mr-1.5 text-[7px]">
+                        F{s.gen}
+                      </span>
+                    )}
+                    {s.variety.toUpperCase()}
+                  </div>
                   <div className="font-lcd text-lg text-bone/60 leading-snug">
                     {s.source || "unknown source"} · harvest {s.year}
                   </div>

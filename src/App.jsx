@@ -1,5 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { Archive, Flame, Flower2, Sprout } from "lucide-react";
+import { Archive, Database, Flame, Flower2, Sprout } from "lucide-react";
+import Modal, { PixelButton } from "./components/Modal.jsx";
+import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import { reducer } from "./game/engine.js";
 import { loadState, saveState } from "./game/storage.js";
 import GardenDashboard from "./views/GardenDashboard.jsx";
@@ -17,6 +19,9 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, loadState);
   const [tab, setTab] = useState("garden");
   const [toast, setToast] = useState(null);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const importRef = useRef();
   const toastTimer = useRef();
 
   // Offline persistence: save on every state change.
@@ -54,7 +59,7 @@ export default function App() {
   return (
     <div className="max-w-md mx-auto min-h-dvh flex flex-col">
       {/* header */}
-      <header className="text-center pt-5 pb-1">
+      <header className="relative text-center pt-5 pb-1">
         <h1 className="font-pixel text-sm text-habanero tracking-widest">
           <Flame size={14} className="inline -mt-1 text-mango" aria-hidden /> PEPPER-GOTCHI{" "}
           <Flame size={14} className="inline -mt-1 text-mango" aria-hidden />
@@ -62,6 +67,13 @@ export default function App() {
         <p className="font-lcd text-lg text-bone/50 mt-1">
           pepper grow tracker · seed vault
         </p>
+        <button
+          onClick={() => setDataOpen(true)}
+          aria-label="Backup & data"
+          className="absolute right-3 top-4 p-2.5 text-bone/40 hover:text-bone"
+        >
+          <Database size={18} />
+        </button>
       </header>
 
       {/* active view */}
@@ -93,6 +105,92 @@ export default function App() {
           })}
         </div>
       </nav>
+
+      {/* backup & data */}
+      {dataOpen && (
+        <Modal title="💾 BACKUP & DATA" onClose={() => setDataOpen(false)}>
+          <p className="font-lcd text-lg text-bone/60 mb-3">
+            Everything lives in this browser. Export a backup file to keep your
+            plants, breeding records, and seed vault safe — or to move to
+            another device.
+          </p>
+          <div className="space-y-2">
+            <PixelButton
+              className="w-full"
+              onClick={() => {
+                const blob = new Blob([JSON.stringify(state, null, 2)], {
+                  type: "application/json",
+                });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download =
+                  "pepper-gotchi-backup-" +
+                  new Date().toISOString().slice(0, 10) +
+                  ".json";
+                a.click();
+                URL.revokeObjectURL(a.href);
+                notify("⬇️ Backup downloaded");
+              }}
+            >
+              ⬇️ EXPORT BACKUP
+            </PixelButton>
+            <PixelButton
+              variant="ghost"
+              className="w-full"
+              onClick={() => importRef.current.click()}
+            >
+              ⬆️ IMPORT BACKUP
+            </PixelButton>
+            <PixelButton
+              variant="danger"
+              className="w-full"
+              onClick={() => setWiping(true)}
+            >
+              🧨 ERASE EVERYTHING
+            </PixelButton>
+          </div>
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files[0];
+              if (!f) return;
+              const rd = new FileReader();
+              rd.onload = () => {
+                try {
+                  const s = JSON.parse(rd.result);
+                  if (!Array.isArray(s.plants) || !Array.isArray(s.seeds))
+                    throw new Error("bad shape");
+                  dispatch({ type: "IMPORT", state: { crosses: [], ...s } });
+                  setDataOpen(false);
+                  notify("✅ Backup imported!");
+                } catch {
+                  notify("❌ That file isn't a Pepper-gotchi backup");
+                }
+              };
+              rd.readAsText(f);
+              e.target.value = "";
+            }}
+          />
+        </Modal>
+      )}
+
+      {wiping && (
+        <ConfirmDialog
+          title="ERASE EVERYTHING?"
+          message="All plants, journals, breeding records, and seeds will be deleted. Export a backup first!"
+          confirmLabel="ERASE ALL"
+          onConfirm={() => {
+            dispatch({ type: "WIPE" });
+            setWiping(false);
+            setDataOpen(false);
+            notify("🧨 Fresh start.");
+          }}
+          onCancel={() => setWiping(false)}
+        />
+      )}
 
       {/* toast */}
       {toast && (

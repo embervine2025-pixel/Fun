@@ -101,6 +101,21 @@ svg.pixelated {
   0% { transform: translate3d(0, 0, 0); opacity: 1; }
   100% { transform: translate3d(0, -46px, 0); opacity: 0; }
 }
+@keyframes px-bee {
+  0%   { transform: translate3d(0, 0, 0) scaleX(1); }
+  45%  { transform: translate3d(120px, -26px, 0) scaleX(1); }
+  50%  { transform: translate3d(126px, -24px, 0) scaleX(-1); }
+  95%  { transform: translate3d(6px, 2px, 0) scaleX(-1); }
+  100% { transform: translate3d(0, 0, 0) scaleX(1); }
+}
+@keyframes px-bee-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-float, .anim-wilt, .anim-blink { animation: none; }
+}
+
 @keyframes px-scan {
   0% { background-position: 0 0; }
   100% { background-position: 0 6px; }

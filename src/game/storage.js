@@ -20,12 +20,14 @@ function normalize(saved) {
   return {
     ...initialState,
     seeds: saved.seeds || [],
+    crosses: saved.crosses || [],
     activePlantId: saved.activePlantId ?? null,
     plants: (saved.plants || []).map((p) => ({
       id: p.id,
       name: p.name,
       variety: p.variety || "Mystery Pepper",
       notes: p.notes || "",
+      gen: p.gen || 0,
       plantedAt: p.plantedAt || now,
       stageIndex: p.stageIndex || 0,
       stageChangedAt: p.stageChangedAt || p.stageStarted || now,
