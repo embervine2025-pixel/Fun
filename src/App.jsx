@@ -1,16 +1,18 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import { Archive, Database, Flame, Flower2, Sprout } from "lucide-react";
+import { Archive, Database, Dna, Flame, Flower2, Sprout } from "lucide-react";
 import Modal, { PixelButton } from "./components/Modal.jsx";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import { reducer } from "./game/engine.js";
 import { loadState, saveState } from "./game/storage.js";
 import GardenDashboard from "./views/GardenDashboard.jsx";
 import PlantManager from "./views/PlantManager.jsx";
+import BreedingLab from "./views/BreedingLab.jsx";
 import SeedVault from "./views/SeedVault.jsx";
 
 const TABS = [
   { key: "garden", label: "Garden", icon: Flower2 },
   { key: "plants", label: "Plants", icon: Sprout },
+  { key: "crosses", label: "Crosses", icon: Dna },
   { key: "vault", label: "Vault", icon: Archive },
 ];
 
@@ -80,6 +82,7 @@ export default function App() {
       <main className="flex-1 pb-24">
         {tab === "garden" && <GardenDashboard {...viewProps} />}
         {tab === "plants" && <PlantManager {...viewProps} />}
+        {tab === "crosses" && <BreedingLab {...viewProps} />}
         {tab === "vault" && <SeedVault {...viewProps} />}
       </main>
 

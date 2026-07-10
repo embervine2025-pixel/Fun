@@ -228,6 +228,12 @@ export function reducer(state, action) {
       return next;
     }
 
+    case "DELETE_CROSS":
+      return {
+        ...state,
+        crosses: (state.crosses || []).filter((c) => c.id !== action.crossId),
+      };
+
     case "SAVE_SEEDS": {
       const plant = state.plants.find((p) => p.id === action.plantId);
       if (!plant || !action.qty) return state;
