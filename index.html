@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peppergotchi 🌶️ — Pepper Plant Tamagotchi</title>
+<style>
+  :root {
+    --cream: #f6efdd;
+    --cream-dark: #eadfc4;
+    --ink: #3a3226;
+    --green: #7a9a52;
+    --green-dark: #55703a;
+    --green-light: #b5c98e;
+    --lcd: #cfe0b0;
+    --lcd-dark: #a9bd85;
+    --red: #d95d43;
+    --red-dark: #b03f2b;
+    --yellow: #f2c14e;
+    --orange: #e8944a;
+    --shadow: rgba(58, 50, 38, .25);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+    background: var(--yellow);
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.25) 0 40px, transparent 41px),
+      radial-gradient(circle at 85% 10%, rgba(255,255,255,.2) 0 30px, transparent 31px),
+      radial-gradient(circle at 70% 80%, rgba(255,255,255,.18) 0 50px, transparent 51px),
+      radial-gradient(circle at 25% 75%, rgba(255,255,255,.2) 0 35px, transparent 36px);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 16px 12px 60px;
+  }
+  h1.app-title {
+    text-align: center;
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    letter-spacing: 2px;
+    color: var(--ink);
+    text-shadow: 2px 2px 0 rgba(255,255,255,.5);
+    margin-bottom: 4px;
+  }
+  .app-sub { text-align: center; font-size: .85rem; opacity: .75; margin-bottom: 16px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab-btn {
+    border: 3px solid var(--ink);
+    background: var(--cream);
+    color: var(--ink);
+    font-weight: bold;
+    font-size: .95rem;
+    padding: 8px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--ink);
+    transition: transform .08s;
+  }
+  .tab-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .tab-btn.active { background: var(--green); color: #fff; }
+  .tab-panel { display: none; max-width: 900px; margin: 0 auto; }
+  .tab-panel.active { display: block; }
+
+  /* ---------- Egg device ---------- */
+  .device-wrap { display: flex; justify-content: center; }
+  .egg {
+    position: relative;
+    width: min(360px, 92vw);
+    background: var(--cream);
+    border: 4px solid var(--ink);
+    border-radius: 48% 48% 46% 46% / 54% 54% 44% 44%;
+    padding: 26px 24px 30px;
+    box-shadow: 0 10px 0 var(--shadow), inset 0 -8px 0 var(--cream-dark);
+  }
+  .egg::before { /* hang tab */
+    content: "";
+    position: absolute;
+    top: -26px; left: 50%;
+    transform: translateX(-50%);
+    width: 44px; height: 34px;
+    background: var(--cream);
+    border: 4px solid var(--ink);
+    border-radius: 14px 14px 4px 4px;
+    z-index: -1;
+  }
+  .egg-title {
+    text-align: center;
+    font-weight: bold;
+    letter-spacing: 3px;
+    color: var(--red);
+    text-shadow: 1px 1px 0 rgba(255,255,255,.7);
+    font-size: 1.05rem;
+    margin-bottom: 10px;
+  }
+  .screen-frame {
+    background: var(--ink);
+    border-radius: 16px;
+    padding: 8px;
+    clip-path: polygon(8% 0, 92% 0, 100% 12%, 100% 88%, 92% 100%, 8% 100%, 0 88%, 0 12%);
+  }
+  .screen {
+    background: var(--lcd);
+    background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 2px, transparent 2px 4px);
+    border-radius: 8px;
+    padding: 8px 8px 6px;
+  }
+  .icon-row {
+    display: flex; justify-content: space-around;
+    font-size: 15px; padding: 2px 0;
+    opacity: .45; user-select: none;
+  }
+  .icon-row span.lit { opacity: 1; filter: none; }
+  .icon-row span { opacity: .35; filter: grayscale(1); transition: opacity .3s; }
+  #petCanvas {
+    display: block;
+    width: 100%;
+    image-rendering: pixelated;
+    background: transparent;
+  }
+  .lcd-text {
+    text-align: center;
+    font-family: "Courier New", monospace;
+    font-weight: bold;
+    font-size: .82rem;
+    color: #2f3b21;
+    min-height: 1.2em;
+    letter-spacing: 1px;
+  }
+  .lcd-name { font-size: .95rem; }
+  .device-buttons {
+    display: flex; justify-content: center; gap: 26px; margin-top: 16px;
+  }
+  .dev-btn {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    border: 3px solid var(--ink);
+    background: var(--red);
+    box-shadow: 0 4px 0 var(--red-dark);
+    cursor: pointer;
+    font-size: 18px;
+    transition: transform .08s;
+  }
+  .dev-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--red-dark); }
+  .dev-btn-label { display: block; text-align: center; font-size: .62rem; font-weight: bold; margin-top: 4px; letter-spacing: 1px; }
+  .dev-btn-wrap { text-align: center; }
+
+  /* ---------- Stat bars ---------- */
+  .stats { margin-top: 10px; }
+  .stat { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: .72rem; font-weight: bold; }
+  .stat .emoji { width: 18px; text-align: center; }
+  .bar { flex: 1; height: 10px; border: 2px solid #2f3b21; border-radius: 6px; background: rgba(255,255,255,.35); overflow: hidden; }
+  .bar > div { height: 100%; background: #55703a; transition: width .4s; }
+  .bar.warn > div { background: var(--orange); }
+  .bar.danger > div { background: var(--red); }
+
+  /* ---------- Plant switcher ---------- */
+  .plant-switcher {
+    display: flex; justify-content: center; align-items: center;
+    gap: 10px; margin: 14px 0 10px; flex-wrap: wrap;
+  }
+  .chip {
+    border: 3px solid var(--ink);
+    background: var(--cream);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-weight: bold;
+    font-size: .82rem;
+    cursor: pointer;
+    box-shadow: 0 2px 0 var(--ink);
+  }
+  .chip.active { background: var(--green); color: #fff; }
+  .chip.add { background: var(--yellow); }
+
+  /* ---------- Cards / forms ---------- */
+  .card {
+    background: var(--cream);
+    border: 4px solid var(--ink);
+    border-radius: 20px;
+    box-shadow: 0 6px 0 var(--shadow);
+    padding: 18px;
+    margin: 14px auto;
+    max-width: 560px;
+  }
+  .card h2 { font-size: 1.1rem; margin-bottom: 10px; letter-spacing: 1px; }
+  .card h2 .small { font-size: .75rem; font-weight: normal; opacity: .7; }
+  label.fld { display: block; font-size: .78rem; font-weight: bold; margin: 8px 0 2px; }
+  input[type=text], input[type=number], input[type=date], select, textarea {
+    width: 100%;
+    border: 3px solid var(--ink);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: .95rem;
+    background: #fff;
+    font-family: inherit;
+    color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 54px; }
+  .btn {
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    padding: 9px 16px;
+    font-weight: bold;
+    font-size: .9rem;
+    cursor: pointer;
+    background: var(--green);
+    color: #fff;
+    box-shadow: 0 3px 0 var(--ink);
+    transition: transform .08s;
+    margin-top: 10px;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .btn.secondary { background: var(--cream-dark); color: var(--ink); }
+  .btn.danger { background: var(--red); }
+  .btn.small { padding: 4px 10px; font-size: .75rem; margin-top: 0; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 480px) { .row2 { grid-template-columns: 1fr; } }
+
+  /* ---------- Growth log ---------- */
+  .log-list { list-style: none; margin-top: 8px; }
+  .log-list li {
+    background: #fff;
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    font-size: .85rem;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .log-list .when { font-size: .7rem; opacity: .65; white-space: nowrap; }
+
+  /* ---------- Seed vault ---------- */
+  .seed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; max-width: 900px; margin: 0 auto; }
+  .seed-packet {
+    background: var(--cream);
+    border: 4px solid var(--ink);
+    border-radius: 14px 14px 18px 18px;
+    box-shadow: 0 5px 0 var(--shadow);
+    padding: 0 0 12px;
+    overflow: hidden;
+    position: relative;
+  }
+  .seed-packet .packet-top {
+    background: repeating-linear-gradient(90deg, var(--red) 0 14px, var(--cream) 14px 28px);
+    height: 14px;
+    border-bottom: 3px solid var(--ink);
+  }
+  .seed-packet .packet-body { padding: 10px 12px 0; }
+  .seed-packet h3 { font-size: 1rem; margin-bottom: 2px; }
+  .seed-packet .meta { font-size: .75rem; opacity: .8; margin-bottom: 6px; }
+  .seed-packet .notes { font-size: .78rem; background: #fff; border: 2px solid var(--ink); border-radius: 8px; padding: 6px; margin-bottom: 8px; }
+  .heatband { display: inline-block; font-size: .68rem; font-weight: bold; border: 2px solid var(--ink); border-radius: 999px; padding: 2px 8px; background: var(--yellow); margin-bottom: 6px; }
+  .heat-3, .heat-4, .heat-5 { background: var(--red); color: #fff; }
+  .heat-2 { background: var(--orange); }
+  .qty-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .qty-controls button {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--ink); background: var(--green-light);
+    font-weight: bold; cursor: pointer; font-size: 1rem;
+  }
+  .packet-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty-note { text-align: center; opacity: .7; font-size: .9rem; padding: 24px; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(80px);
+    background: var(--ink); color: var(--cream);
+    padding: 10px 20px; border-radius: 999px;
+    font-weight: bold; font-size: .9rem;
+    transition: transform .3s;
+    z-index: 50;
+    pointer-events: none;
+    max-width: 90vw; text-align: center;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Modal ---------- */
+  .modal-bg {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(58,50,38,.55);
+    z-index: 40;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  .modal-bg.show { display: flex; align-items: flex-start; justify-content: center; }
+  .modal-bg .card { margin-top: 40px; width: 100%; }
+
+  footer { text-align: center; margin-top: 30px; font-size: .75rem; opacity: .6; }
+</style>
+</head>
+<body>
+
+<h1 class="app-title">🌶️ PEPPERGOTCHI 🌶️</h1>
+<p class="app-sub">keep your pepper pals happy &amp; watch them grow</p>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="pet">🥚 My Peppers</button>
+  <button class="tab-btn" data-tab="seeds">🌰 Seed Vault</button>
+  <button class="tab-btn" data-tab="settings">⚙️ Data</button>
+</div>
+
+<!-- ============ PET TAB ============ -->
+<div class="tab-panel active" id="tab-pet">
+  <div class="plant-switcher" id="plantSwitcher"></div>
+
+  <div class="device-wrap">
+    <div class="egg">
+      <div class="egg-title">PEPPERGOTCHI</div>
+      <div class="screen-frame">
+        <div class="screen">
+          <div class="icon-row" id="iconRowTop">
+            <span data-icon="water" title="thirsty">💧</span>
+            <span data-icon="sun" title="needs light">☀️</span>
+            <span data-icon="grow" title="growing">📏</span>
+            <span data-icon="party" title="party!">🎉</span>
+          </div>
+          <canvas id="petCanvas" width="128" height="96"></canvas>
+          <div class="lcd-text lcd-name" id="lcdName">—</div>
+          <div class="lcd-text" id="lcdMsg"></div>
+          <div class="stats">
+            <div class="stat"><span class="emoji">💧</span><div class="bar" id="barWater"><div></div></div></div>
+            <div class="stat"><span class="emoji">😊</span><div class="bar" id="barHappy"><div></div></div></div>
+            <div class="stat"><span class="emoji">🌱</span><div class="bar" id="barGrow"><div></div></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="device-buttons">
+        <div class="dev-btn-wrap">
+          <button class="dev-btn" id="btnWater" title="Water your pepper">💧</button>
+          <span class="dev-btn-label">WATER</span>
+        </div>
+        <div class="dev-btn-wrap">
+          <button class="dev-btn" id="btnMeasure" title="Log a measurement">📏</button>
+          <span class="dev-btn-label">MEASURE</span>
+        </div>
+        <div class="dev-btn-wrap">
+          <button class="dev-btn" id="btnPet" title="Say hi!">👋</button>
+          <span class="dev-btn-label">PET</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="plantInfoCard" style="display:none">
+    <h2 id="infoTitle">🌶️ Plant info</h2>
+    <div id="infoBody" style="font-size:.88rem; line-height:1.6"></div>
+    <button class="btn secondary small" id="btnAdvance">⬆️ Advance stage</button>
+    <button class="btn secondary small" id="btnEditPlant">✏️ Edit</button>
+    <button class="btn danger small" id="btnDeletePlant">🗑️ Remove</button>
+    <h2 style="margin-top:16px">📓 Growth log</h2>
+    <ul class="log-list" id="growthLog"></ul>
+  </div>
+
+  <div class="card" id="noPlantCard">
+    <h2>🥚 Hatch your first pepper pal!</h2>
+    <p style="font-size:.88rem; margin-bottom:8px">Add a pepper plant and it becomes a little creature that grows as your real plant does. Water it here whenever you water for real!</p>
+    <button class="btn" id="btnFirstPlant">➕ Add a pepper plant</button>
+  </div>
+</div>
+
+<!-- ============ SEEDS TAB ============ -->
+<div class="tab-panel" id="tab-seeds">
+  <div class="card">
+    <h2>🌰 Add seeds to the vault</h2>
+    <div class="row2">
+      <div>
+        <label class="fld">Variety *</label>
+        <input type="text" id="seedVariety" placeholder="e.g. Carolina Reaper">
+      </div>
+      <div>
+        <label class="fld">Seed count</label>
+        <input type="number" id="seedQty" min="0" value="10">
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label class="fld">Source</label>
+        <input type="text" id="seedSource" placeholder="e.g. saved 2025, Baker Creek…">
+      </div>
+      <div>
+        <label class="fld">Heat level</label>
+        <select id="seedHeat">
+          <option value="0">😊 Sweet (no heat)</option>
+          <option value="1">🌶️ Mild</option>
+          <option value="2">🌶️🌶️ Medium</option>
+          <option value="3" selected>🌶️🌶️🌶️ Hot</option>
+          <option value="4">🌶️🌶️🌶️🌶️ Super-hot</option>
+          <option value="5">☠️ Nuclear</option>
+        </select>
+      </div>
+    </div>
+    <label class="fld">Notes</label>
+    <textarea id="seedNotes" placeholder="germination tips, where you got them…"></textarea>
+    <button class="btn" id="btnAddSeed">➕ Add packet</button>
+  </div>
+  <div class="seed-grid" id="seedGrid"></div>
+  <p class="empty-note" id="seedEmpty">No seeds yet — add your first packet above! 🌱</p>
+</div>
+
+<!-- ============ SETTINGS TAB ============ -->
+<div class="tab-panel" id="tab-settings">
+  <div class="card">
+    <h2>💾 Your data</h2>
+    <p style="font-size:.85rem; margin-bottom:8px">Everything is saved automatically in this browser (localStorage). Export a backup or move data between devices below.</p>
+    <button class="btn secondary" id="btnExport">⬇️ Export backup (JSON)</button>
+    <button class="btn secondary" id="btnImport">⬆️ Import backup</button>
+    <input type="file" id="importFile" accept="application/json" style="display:none">
+    <button class="btn danger" id="btnWipe">🧨 Erase everything</button>
+  </div>
+  <div class="card">
+    <h2>ℹ️ How it works</h2>
+    <div style="font-size:.85rem; line-height:1.7">
+      <b>💧 Water bar</b> drains over ~3 days. Press WATER when you water the real plant.<br>
+      <b>😊 Happiness</b> comes from being watered on time, getting pets, and logging growth.<br>
+      <b>🌱 Growth bar</b> shows progress to the next stage. Stages: 🥚 seed → 🌱 sprout → 🌿 seedling → 🪴 young plant → 🌸 flowering → 🌶️ fruiting!<br>
+      Advance the stage manually whenever your real plant levels up.
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLANT MODAL ============ -->
+<div class="modal-bg" id="plantModal">
+  <div class="card">
+    <h2 id="plantModalTitle">➕ New pepper pal</h2>
+    <label class="fld">Name *</label>
+    <input type="text" id="plantName" placeholder="e.g. Sir Scorch-a-lot">
+    <div class="row2">
+      <div>
+        <label class="fld">Variety</label>
+        <input type="text" id="plantVariety" placeholder="e.g. Jalapeño">
+      </div>
+      <div>
+        <label class="fld">Sown / planted date</label>
+        <input type="date" id="plantDate">
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <label class="fld">Current stage</label>
+        <select id="plantStage">
+          <option value="0">🥚 Seed (sown)</option>
+          <option value="1">🌱 Sprout</option>
+          <option value="2">🌿 Seedling</option>
+          <option value="3">🪴 Young plant</option>
+          <option value="4">🌸 Flowering</option>
+          <option value="5">🌶️ Fruiting</option>
+        </select>
+      </div>
+      <div>
+        <label class="fld">Watering interval (days)</label>
+        <input type="number" id="plantInterval" min="1" max="14" value="3">
+      </div>
+    </div>
+    <button class="btn" id="btnSavePlant">💾 Save</button>
+    <button class="btn secondary" id="btnCancelPlant">Cancel</button>
+  </div>
+</div>
+
+<!-- ============ MEASURE MODAL ============ -->
+<div class="modal-bg" id="measureModal">
+  <div class="card">
+    <h2>📏 Log growth</h2>
+    <label class="fld">Height (cm) — optional</label>
+    <input type="number" id="measureHeight" min="0" step="0.5" placeholder="e.g. 12.5">
+    <label class="fld">Note</label>
+    <input type="text" id="measureNote" placeholder="e.g. two new true leaves!">
+    <button class="btn" id="btnSaveMeasure">💾 Log it</button>
+    <button class="btn secondary" id="btnCancelMeasure">Cancel</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<footer>made with 🌶️ · your data never leaves this browser</footer>
+
+<script>
+"use strict";
+/* =====================================================
+   Peppergotchi — a tamagotchi-style pepper plant tracker
+   ===================================================== */
+
+const STORE_KEY = "peppergotchi-v1";
+const DAY = 24 * 60 * 60 * 1000;
+const STAGES = [
+  { name: "Seed",        emoji: "🥚", days: 10 },
+  { name: "Sprout",      emoji: "🌱", days: 14 },
+  { name: "Seedling",    emoji: "🌿", days: 21 },
+  { name: "Young plant", emoji: "🪴", days: 30 },
+  { name: "Flowering",   emoji: "🌸", days: 21 },
+  { name: "Fruiting",    emoji: "🌶️", days: Infinity },
+];
+
+let state = load();
+let currentPlantId = state.plants[0] ? state.plants[0].id : null;
+let editingPlantId = null;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (Array.isArray(s.plants) && Array.isArray(s.seeds)) return s;
+    }
+  } catch (e) { /* corrupted -> start fresh */ }
+  return { plants: [], seeds: [] };
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmtDate(ts) { return new Date(ts).toLocaleDateString(); }
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+/* ---------- derived pet stats ---------- */
+function getPlant(id) { return state.plants.find(p => p.id === id); }
+
+function waterLevel(p) {
+  // 100 right after watering, 0 after 1.5x the interval
+  const since = Date.now() - p.lastWatered;
+  const full = p.intervalDays * DAY * 1.5;
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - since / full))));
+}
+function happiness(p) {
+  const w = waterLevel(p);
+  const petBonus = Math.max(0, 20 - Math.floor((Date.now() - (p.lastPetted || 0)) / DAY) * 5);
+  const logBonus = Math.max(0, 15 - Math.floor((Date.now() - (p.lastLogged || p.planted)) / DAY) * 2);
+  return Math.max(0, Math.min(100, Math.round(w * 0.7 + petBonus + logBonus)));
+}
+function growthProgress(p) {
+  const st = STAGES[p.stage];
+  if (!isFinite(st.days)) return 100;
+  const since = Date.now() - (p.stageStarted || p.planted);
+  return Math.max(0, Math.min(100, Math.round(100 * since / (st.days * DAY))));
+}
+function mood(p) {
+  const w = waterLevel(p);
+  const h = happiness(p);
+  if (w <= 15) return "wilted";
+  if (w <= 40) return "thirsty";
+  if (h >= 75) return "happy";
+  return "ok";
+}
+
+/* =====================================================
+   Pixel-art rendering
+   ===================================================== */
+const canvas = document.getElementById("petCanvas");
+const ctx = canvas.getContext("2d");
+const PAL = {
+  ".": null,
+  g: "#55703a", // dark green
+  G: "#7a9a52", // green
+  l: "#b5c98e", // light green
+  b: "#6b4f2f", // soil brown
+  B: "#8a6a42", // light brown
+  r: "#d95d43", // pepper red
+  R: "#b03f2b", // pepper dark red
+  y: "#f2c14e", // yellow
+  o: "#e8944a", // orange
+  w: "#ffffff",
+  k: "#3a3226", // ink (eyes)
+  p: "#e79ab0", // pink (flower)
+};
+
+// 16-wide sprite rows; drawn centered. Eyes ('k') get replaced per-mood.
+const SPRITES = [
+  [ // 0 seed: a happy little seed in soil
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "......BBBB......",
+    ".....B.yy.B.....",
+    ".....Byyyy1.....",
+    ".....B2yyyB.....",
+    "......Byyy......",
+    ".......BB.......",
+  ],
+  [ // 1 sprout
+    "................",
+    "................",
+    ".......ll.......",
+    "......lGGl......",
+    "...ll..GG..ll...",
+    "..lGGl.GG.lGGl..",
+    "...ll.GGGG.ll...",
+    ".....G1GG2G.....",
+    ".....GGGGGG.....",
+    "......GGGG......",
+    ".......GG.......",
+  ],
+  [ // 2 seedling
+    "................",
+    "....ll....ll....",
+    "...lGGl..lGGl...",
+    "....lGG..GGl....",
+    "......G..G......",
+    "..ll..GGGG..ll..",
+    ".lGGl.G1G2.lGGl.",
+    "..lGGGGGGGGGGl..",
+    "....GGGGGGGG....",
+    "......GGGG......",
+    ".......GG.......",
+  ],
+  [ // 3 young plant
+    "....ll....ll....",
+    "...lGGl..lGGl...",
+    "..lGGGGllGGGGl..",
+    "...lGGGGGGGGl...",
+    ".ll..GGGGGG..ll.",
+    "lGGl.G1GG2G.lGGl",
+    ".lGGGGGGGGGGGGl.",
+    "...GGGGGGGGGG...",
+    ".....GGGGGG.....",
+    ".......GG.......",
+    ".......GG.......",
+  ],
+  [ // 4 flowering
+    "..p.ll....ll.p..",
+    ".pwplGGllGGlpwp.",
+    "..p.GGGGGGGG.p..",
+    "..lGGGGGGGGGGl..",
+    ".ll.GGGGGGGG.ll.",
+    "lGGlG1GGGG2GlGGl",
+    ".lGGGGGGGGGGGGl.",
+    "..pGGGGGGGGGGp..",
+    ".pwpGGGGGGGGpwp.",
+    "..p...GG.....p..",
+    "......GG........",
+  ],
+  [ // 5 fruiting!
+    "..g.ll....ll.g..",
+    ".grglGGllGGlgrg.",
+    "..r.GGGGGGGG.r..",
+    "..lGGGGGGGGGGl..",
+    ".rr.GGGGGGGG.rr.",
+    "rRrlG1GGGG2GlrRr",
+    ".rr.GGGGGGGG.rr.",
+    "..gGGGGGGGGGGg..",
+    ".grgGGGGGGGGgrg.",
+    "..r...GG.....r..",
+    "..R...GG.....R..",
+  ],
+];
+
+let frame = 0;
+let overlayMsg = null; // {text, until}
+let bounce = 0;        // extra bounce frames after interaction
+let particles = [];    // {x,y,vy,char,life}
+
+function drawPet() {
+  frame++;
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const p = getPlant(currentPlantId);
+
+  // soil ground
+  ctx.fillStyle = PAL.b;
+  ctx.fillRect(8, H - 14, W - 16, 8);
+  ctx.fillStyle = PAL.B;
+  for (let i = 0; i < 8; i++) ctx.fillRect(12 + i * 14, H - 12, 4, 2);
+
+  if (!p) {
+    ctx.fillStyle = PAL.k;
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("no pepper yet!", W / 2, H / 2);
+    return;
+  }
+
+  const m = mood(p);
+  const sprite = SPRITES[p.stage];
+  const px = 6; // pixel size
+  const spriteW = 16 * px;
+  const spriteH = sprite.length * px;
+  const wob = (m === "wilted") ? 0 : Math.round(Math.sin(frame / 8) * 2);
+  const extra = bounce > 0 ? -Math.abs(Math.round(Math.sin(frame) * 4)) : 0;
+  if (bounce > 0) bounce--;
+  const ox = Math.round((W - spriteW) / 2);
+  const oy = H - 14 - spriteH + (m === "wilted" ? 4 : wob) + extra;
+
+  const blink = (frame % 70) < 4;
+  for (let r = 0; r < sprite.length; r++) {
+    const row = sprite[r];
+    for (let c = 0; c < row.length; c++) {
+      let ch = row[c];
+      if (ch === "1" || ch === "2") {
+        // eye pixels
+        if (m === "wilted") { drawEye(ox + c * px, oy + r * px, px, "x"); continue; }
+        if (blink) { drawEye(ox + c * px, oy + r * px, px, "-"); continue; }
+        drawEye(ox + c * px, oy + r * px, px, "o");
+        continue;
+      }
+      const col = PAL[ch];
+      if (!col) continue;
+      ctx.fillStyle = col;
+      ctx.fillRect(ox + c * px, oy + r * px, px, px);
+    }
+  }
+
+  // mouth under the eyes (find eye row)
+  const eyeRow = sprite.findIndex(row => row.includes("1"));
+  if (eyeRow >= 0) {
+    const my = oy + (eyeRow + 1) * px + 2;
+    ctx.fillStyle = PAL.k;
+    const mx = ox + 8 * px;
+    if (m === "happy") { // smile
+      ctx.fillRect(mx - px, my, px * 2, 3);
+      ctx.fillRect(mx - px - 3, my - 3, 3, 3);
+      ctx.fillRect(mx + px, my - 3, 3, 3);
+    } else if (m === "wilted") { // frown
+      ctx.fillRect(mx - px, my, px * 2, 3);
+      ctx.fillRect(mx - px - 3, my + 3, 3, 3);
+      ctx.fillRect(mx + px, my + 3, 3, 3);
+    } else {
+      ctx.fillRect(mx - px + 2, my, px * 2 - 4, 3);
+    }
+  }
+
+  // thirsty sweat drop
+  if (m === "thirsty" || m === "wilted") {
+    ctx.font = "12px serif";
+    ctx.textAlign = "left";
+    const dy = oy + 10 + Math.round(Math.sin(frame / 5) * 2);
+    ctx.fillText("💧", ox + spriteW - 6, dy);
+  }
+
+  // particles (hearts / sparkles)
+  ctx.font = "11px serif";
+  particles = particles.filter(pt => pt.life > 0);
+  for (const pt of particles) {
+    ctx.globalAlpha = Math.min(1, pt.life / 20);
+    ctx.fillText(pt.char, pt.x, pt.y);
+    pt.y += pt.vy;
+    pt.life--;
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawEye(x, y, px, kind) {
+  if (kind === "o") {
+    ctx.fillStyle = PAL.k;
+    ctx.fillRect(x, y, px, px);
+    ctx.fillStyle = PAL.w;
+    ctx.fillRect(x + 1, y + 1, 2, 2);
+  } else if (kind === "-") {
+    ctx.fillStyle = PAL.k;
+    ctx.fillRect(x, y + px - 3, px, 3);
+  } else { // x eyes
+    ctx.fillStyle = PAL.k;
+    ctx.fillRect(x, y, 2, 2); ctx.fillRect(x + px - 2, y, 2, 2);
+    ctx.fillRect(x + 2, y + 2, px - 4, px - 4);
+    ctx.fillRect(x, y + px - 2, 2, 2); ctx.fillRect(x + px - 2, y + px - 2, 2, 2);
+  }
+}
+
+function spawnParticles(char, n) {
+  const W = canvas.width;
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: W / 2 - 30 + Math.random() * 60,
+      y: 50 + Math.random() * 20,
+      vy: -0.6 - Math.random() * 0.6,
+      char,
+      life: 25 + Math.random() * 20,
+    });
+  }
+}
+
+setInterval(drawPet, 100);
+
+/* =====================================================
+   Pet UI
+   ===================================================== */
+function renderPet() {
+  const switcher = document.getElementById("plantSwitcher");
+  switcher.innerHTML = "";
+  for (const p of state.plants) {
+    const chip = document.createElement("button");
+    chip.className = "chip" + (p.id === currentPlantId ? " active" : "");
+    chip.textContent = STAGES[p.stage].emoji + " " + p.name;
+    chip.onclick = () => { currentPlantId = p.id; renderPet(); };
+    switcher.appendChild(chip);
+  }
+  const add = document.createElement("button");
+  add.className = "chip add";
+  add.textContent = "➕ new";
+  add.onclick = () => openPlantModal(null);
+  switcher.appendChild(add);
+
+  const p = getPlant(currentPlantId);
+  document.getElementById("noPlantCard").style.display = p ? "none" : "block";
+  document.getElementById("plantInfoCard").style.display = p ? "block" : "none";
+
+  const lcdName = document.getElementById("lcdName");
+  const lcdMsg = document.getElementById("lcdMsg");
+  if (!p) {
+    lcdName.textContent = "— press ➕ new —";
+    lcdMsg.textContent = "";
+    setBar("barWater", 0); setBar("barHappy", 0); setBar("barGrow", 0);
+    setIcons({});
+    return;
+  }
+
+  const w = waterLevel(p), h = happiness(p), g = growthProgress(p);
+  lcdName.textContent = p.name.toUpperCase();
+  const m = mood(p);
+  const msgs = {
+    wilted: "so thirsty... water me!!",
+    thirsty: "getting thirsty here 💧",
+    happy: "life is spicy & good!",
+    ok: "just vibing 🌱",
+  };
+  lcdMsg.textContent = overlayMsg && overlayMsg.until > Date.now() ? overlayMsg.text : msgs[m];
+
+  setBar("barWater", w);
+  setBar("barHappy", h);
+  setBar("barGrow", g);
+  setIcons({
+    water: w <= 40,
+    grow: g >= 100 && p.stage < STAGES.length - 1,
+    party: p.stage === STAGES.length - 1,
+    sun: false,
+  });
+
+  // info card
+  const st = STAGES[p.stage];
+  const ageDays = Math.floor((Date.now() - p.planted) / DAY);
+  const sinceWater = Math.floor((Date.now() - p.lastWatered) / DAY);
+  document.getElementById("infoTitle").textContent = `${st.emoji} ${p.name}`;
+  document.getElementById("infoBody").innerHTML =
+    `<b>Variety:</b> ${esc(p.variety || "mystery pepper")}<br>` +
+    `<b>Stage:</b> ${st.emoji} ${st.name}` +
+    (g >= 100 && p.stage < STAGES.length - 1 ? ` — <b style="color:var(--green-dark)">ready to advance! ⬆️</b>` : ` (${g}% to next)`) + `<br>` +
+    `<b>Age:</b> ${ageDays} day${ageDays === 1 ? "" : "s"} since ${fmtDate(p.planted)}<br>` +
+    `<b>Last watered:</b> ${sinceWater === 0 ? "today 💦" : sinceWater + " day(s) ago"} (every ${p.intervalDays} days)`;
+
+  const logEl = document.getElementById("growthLog");
+  logEl.innerHTML = "";
+  const entries = (p.log || []).slice().reverse().slice(0, 30);
+  if (!entries.length) logEl.innerHTML = '<li><span>No entries yet — press 📏 MEASURE!</span></li>';
+  for (const e of entries) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${e.height != null ? `<b>${esc(e.height)} cm</b> ` : ""}${esc(e.note || "")}</span><span class="when">${fmtDate(e.ts)}</span>`;
+    logEl.appendChild(li);
+  }
+}
+
+function setBar(id, v) {
+  const bar = document.getElementById(id);
+  bar.firstElementChild.style.width = v + "%";
+  bar.classList.toggle("danger", v <= 20);
+  bar.classList.toggle("warn", v > 20 && v <= 45);
+}
+function setIcons(lit) {
+  document.querySelectorAll("#iconRowTop span").forEach(s => {
+    s.classList.toggle("lit", !!lit[s.dataset.icon]);
+  });
+}
+function flashMsg(text, ms = 3000) {
+  overlayMsg = { text, until: Date.now() + ms };
+  renderPet();
+}
+
+/* ---------- device buttons ---------- */
+document.getElementById("btnWater").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return toast("Add a pepper plant first! 🌶️");
+  p.lastWatered = Date.now();
+  save(); bounce = 20;
+  spawnParticles("💧", 6);
+  flashMsg("glug glug... thanks!! 💙");
+  renderPet();
+};
+document.getElementById("btnPet").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return toast("Add a pepper plant first! 🌶️");
+  p.lastPetted = Date.now();
+  save(); bounce = 20;
+  spawnParticles("💚", 5);
+  flashMsg(["hehe that tickles!", "best plant parent!!", "🌶️ spicy hugs 🌶️"][Math.floor(Math.random() * 3)]);
+  renderPet();
+};
+document.getElementById("btnMeasure").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return toast("Add a pepper plant first! 🌶️");
+  document.getElementById("measureHeight").value = "";
+  document.getElementById("measureNote").value = "";
+  document.getElementById("measureModal").classList.add("show");
+};
+document.getElementById("btnSaveMeasure").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return;
+  const hRaw = document.getElementById("measureHeight").value.trim();
+  const note = document.getElementById("measureNote").value.trim();
+  if (!hRaw && !note) return toast("Add a height or a note!");
+  p.log = p.log || [];
+  p.log.push({ ts: Date.now(), height: hRaw ? parseFloat(hRaw) : null, note });
+  p.lastLogged = Date.now();
+  save();
+  document.getElementById("measureModal").classList.remove("show");
+  bounce = 15;
+  spawnParticles("✨", 5);
+  flashMsg("look how I've grown! 📏");
+  renderPet();
+};
+document.getElementById("btnCancelMeasure").onclick = () =>
+  document.getElementById("measureModal").classList.remove("show");
+
+document.getElementById("btnAdvance").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return;
+  if (p.stage >= STAGES.length - 1) return toast("Already fruiting — max level! 🌶️🎉");
+  p.stage++;
+  p.stageStarted = Date.now();
+  p.log = p.log || [];
+  p.log.push({ ts: Date.now(), height: null, note: `⬆️ evolved into ${STAGES[p.stage].name}!` });
+  save(); bounce = 30;
+  spawnParticles("🎉", 8);
+  flashMsg(`EVOLVED! now a ${STAGES[p.stage].name}! ${STAGES[p.stage].emoji}`, 4000);
+  renderPet();
+};
+
+/* ---------- plant modal ---------- */
+function openPlantModal(id) {
+  editingPlantId = id;
+  const p = id ? getPlant(id) : null;
+  document.getElementById("plantModalTitle").textContent = p ? "✏️ Edit " + p.name : "➕ New pepper pal";
+  document.getElementById("plantName").value = p ? p.name : "";
+  document.getElementById("plantVariety").value = p ? (p.variety || "") : "";
+  document.getElementById("plantDate").value = new Date(p ? p.planted : Date.now()).toISOString().slice(0, 10);
+  document.getElementById("plantStage").value = p ? p.stage : 0;
+  document.getElementById("plantInterval").value = p ? p.intervalDays : 3;
+  document.getElementById("plantModal").classList.add("show");
+}
+document.getElementById("btnFirstPlant").onclick = () => openPlantModal(null);
+document.getElementById("btnEditPlant").onclick = () => openPlantModal(currentPlantId);
+document.getElementById("btnCancelPlant").onclick = () =>
+  document.getElementById("plantModal").classList.remove("show");
+
+document.getElementById("btnSavePlant").onclick = () => {
+  const name = document.getElementById("plantName").value.trim();
+  if (!name) return toast("Give your pepper a name! 🌶️");
+  const variety = document.getElementById("plantVariety").value.trim();
+  const dateVal = document.getElementById("plantDate").value;
+  const planted = dateVal ? new Date(dateVal + "T12:00:00").getTime() : Date.now();
+  const stage = parseInt(document.getElementById("plantStage").value, 10) || 0;
+  const intervalDays = Math.max(1, parseInt(document.getElementById("plantInterval").value, 10) || 3);
+
+  if (editingPlantId) {
+    const p = getPlant(editingPlantId);
+    Object.assign(p, { name, variety, planted, intervalDays });
+    if (p.stage !== stage) { p.stage = stage; p.stageStarted = Date.now(); }
+  } else {
+    const p = {
+      id: uid(), name, variety, planted, stage,
+      stageStarted: Date.now(),
+      lastWatered: Date.now(),
+      lastPetted: Date.now(),
+      lastLogged: Date.now(),
+      intervalDays,
+      log: [{ ts: Date.now(), height: null, note: "🥚 a new pepper pal appears!" }],
+    };
+    state.plants.push(p);
+    currentPlantId = p.id;
+    spawnParticles("🎉", 8);
+    flashMsg("hello world!! 🌶️", 3500);
+  }
+  save();
+  document.getElementById("plantModal").classList.remove("show");
+  renderPet();
+};
+
+document.getElementById("btnDeletePlant").onclick = () => {
+  const p = getPlant(currentPlantId);
+  if (!p) return;
+  if (!confirm(`Remove ${p.name}? Their growth log goes too.`)) return;
+  state.plants = state.plants.filter(x => x.id !== p.id);
+  currentPlantId = state.plants[0] ? state.plants[0].id : null;
+  save();
+  renderPet();
+  toast("👋 farewell, little pepper");
+};
+
+/* =====================================================
+   Seed vault
+   ===================================================== */
+function heatLabel(h) {
+  return ["😊 Sweet", "🌶️ Mild", "🌶️🌶️ Medium", "🌶️🌶️🌶️ Hot", "🌶️x4 Super-hot", "☠️ Nuclear"][h] || "🌶️";
+}
+function renderSeeds() {
+  const grid = document.getElementById("seedGrid");
+  grid.innerHTML = "";
+  document.getElementById("seedEmpty").style.display = state.seeds.length ? "none" : "block";
+  for (const s of state.seeds) {
+    const el = document.createElement("div");
+    el.className = "seed-packet";
+    el.innerHTML = `
+      <div class="packet-top"></div>
+      <div class="packet-body">
+        <h3>🌰 ${esc(s.variety)}</h3>
+        <span class="heatband heat-${s.heat}">${heatLabel(s.heat)}</span>
+        <div class="meta">${s.source ? "from " + esc(s.source) + " · " : ""}added ${fmtDate(s.added)}</div>
+        ${s.notes ? `<div class="notes">${esc(s.notes)}</div>` : ""}
+        <div class="qty-controls">
+          <button data-act="dec">−</button>
+          <b>${s.qty}</b> seed${s.qty === 1 ? "" : "s"}
+          <button data-act="inc">+</button>
+        </div>
+        <div class="packet-actions">
+          <button class="btn small" data-act="sow">🌱 Sow one</button>
+          <button class="btn danger small" data-act="del">🗑️</button>
+        </div>
+      </div>`;
+    el.addEventListener("click", (ev) => {
+      const act = ev.target.dataset && ev.target.dataset.act;
+      if (!act) return;
+      if (act === "inc") s.qty++;
+      if (act === "dec") s.qty = Math.max(0, s.qty - 1);
+      if (act === "del") {
+        if (!confirm(`Delete the ${s.variety} packet?`)) return;
+        state.seeds = state.seeds.filter(x => x.id !== s.id);
+      }
+      if (act === "sow") {
+        if (s.qty <= 0) { toast("Packet is empty! 😢"); return; }
+        s.qty--;
+        save(); renderSeeds();
+        if (confirm(`Sowed one ${s.variety} seed! 🌱\nHatch it as a new pepper pal?`)) {
+          switchTab("pet");
+          openPlantModal(null);
+          document.getElementById("plantVariety").value = s.variety;
+          document.getElementById("plantName").value = "";
+        }
+        return;
+      }
+      save(); renderSeeds();
+    });
+    grid.appendChild(el);
+  }
+}
+document.getElementById("btnAddSeed").onclick = () => {
+  const variety = document.getElementById("seedVariety").value.trim();
+  if (!variety) return toast("What variety are the seeds? 🌶️");
+  state.seeds.push({
+    id: uid(),
+    variety,
+    qty: Math.max(0, parseInt(document.getElementById("seedQty").value, 10) || 0),
+    source: document.getElementById("seedSource").value.trim(),
+    heat: parseInt(document.getElementById("seedHeat").value, 10) || 0,
+    notes: document.getElementById("seedNotes").value.trim(),
+    added: Date.now(),
+  });
+  save();
+  document.getElementById("seedVariety").value = "";
+  document.getElementById("seedSource").value = "";
+  document.getElementById("seedNotes").value = "";
+  document.getElementById("seedQty").value = 10;
+  renderSeeds();
+  toast("🌰 Packet added to the vault!");
+};
+
+/* =====================================================
+   Tabs, data import/export
+   ===================================================== */
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".tab-panel").forEach(p =>
+    p.classList.toggle("active", p.id === "tab-" + name));
+}
+document.querySelectorAll(".tab-btn").forEach(b =>
+  b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+document.getElementById("btnExport").onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "peppergotchi-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+document.getElementById("btnImport").onclick = () =>
+  document.getElementById("importFile").click();
+document.getElementById("importFile").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const s = JSON.parse(rd.result);
+      if (!Array.isArray(s.plants) || !Array.isArray(s.seeds)) throw new Error("bad shape");
+      state = s;
+      currentPlantId = state.plants[0] ? state.plants[0].id : null;
+      save(); renderPet(); renderSeeds();
+      toast("✅ Backup imported!");
+    } catch (err) {
+      toast("❌ That file doesn't look like a Peppergotchi backup");
+    }
+  };
+  rd.readAsText(f);
+  e.target.value = "";
+};
+document.getElementById("btnWipe").onclick = () => {
+  if (!confirm("Erase ALL plants and seeds? This cannot be undone!")) return;
+  if (!confirm("Really really sure? Your pepper pals will miss you 🥺")) return;
+  state = { plants: [], seeds: [] };
+  currentPlantId = null;
+  save(); renderPet(); renderSeeds();
+  toast("🧨 Fresh start.");
+};
+
+// close modals on background click
+document.querySelectorAll(".modal-bg").forEach(m =>
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("show"); }));
+
+// refresh stat bars every 30s so decay is visible over time
+setInterval(renderPet, 30000);
+
+renderPet();
+renderSeeds();
+</script>
+</body>
+</html>
