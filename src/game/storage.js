@@ -6,6 +6,15 @@ import { initialState } from "./engine.js";
 
 const KEYS = ["pepper-gotchi-v3", "pepper-gotchi-v2"]; // newest first
 
+// Older versions logged every care action (watering, feeding, pruning,
+// chatting, XP evolutions). The journal is for real observations now —
+// drop those entries, keep measurements, notes, and stage changes.
+const LEGACY_LOG = /^(Watered|Fed nutrients|Pruned & tidied|Had a chat|💧|🧪|✂️|💬)|Evolved into/;
+
+function cleanLogs(logs) {
+  return (logs || []).filter((e) => e.height != null || !LEGACY_LOG.test(e.text || ""));
+}
+
 function normalize(saved) {
   const now = Date.now();
   return {
@@ -20,7 +29,7 @@ function normalize(saved) {
       plantedAt: p.plantedAt || now,
       stageIndex: p.stageIndex || 0,
       stageChangedAt: p.stageChangedAt || p.stageStarted || now,
-      logs: (p.logs || []).slice(0, 100),
+      logs: cleanLogs(p.logs).slice(0, 100),
     })),
   };
 }
