@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+/* Self-hosted retro fonts (inlined into the bundle — works fully offline) */
+@font-face {
+  font-family: "Press Start 2P";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/ps2p.woff2") format("woff2");
+}
+@font-face {
+  font-family: "VT323";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/vt323.woff2") format("woff2");
+}
+
+@theme {
+  /* Retro-arcade garden palette */
+  --color-bark: #1a1f16;
+  --color-bark-deep: #12160f;
+  --color-bark-card: #232b1d;
+  --color-bark-edge: #39442e;
+  --color-lcd: #2b3229;
+  --color-lcd-lit: #3a4534;
+  --color-foliage: #5ee04a;
+  --color-foliage-neon: #a8ff5e;
+  --color-foliage-deep: #177a2c;
+  --color-habanero: #ff4d2e;
+  --color-habanero-deep: #c72c12;
+  --color-mango: #ff9e2e;
+  --color-sun: #ffd93b;
+  --color-aqua: #4ed6ff;
+  --color-orchid: #ff7ac2;
+  --color-bone: #e8e6d8;
+  --color-terracotta: #c96f3b;
+
+  --font-pixel: "Press Start 2P", "Courier New", monospace;
+  --font-lcd: "VT323", "Courier New", monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-bark);
+  color: var(--color-bone);
+  font-family: var(--font-lcd);
+  overscroll-behavior-y: none;
+}
+
+/* Razor-sharp pixel rendering everywhere sprites appear */
+.pixelated,
+.pixelated svg,
+svg.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---- hardware-accelerated idle animations ---- */
+@keyframes px-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -2px, 0); }
+}
+@keyframes px-bounce {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  30% { transform: translate3d(0, -6px, 0) scale(1.03); }
+  60% { transform: translate3d(0, 0, 0) scale(0.98); }
+}
+@keyframes px-wilt-sway {
+  0%, 100% { transform: translate3d(0, 2px, 0) rotate(-1.5deg); }
+  50% { transform: translate3d(0, 3px, 0) rotate(1deg); }
+}
+@keyframes px-sparkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+@keyframes px-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.12); }
+}
+@keyframes px-pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes px-toast-in {
+  0% { transform: translate3d(-50%, 24px, 0); opacity: 0; }
+  100% { transform: translate3d(-50%, 0, 0); opacity: 1; }
+}
+@keyframes px-particle-rise {
+  0% { transform: translate3d(0, 0, 0); opacity: 1; }
+  100% { transform: translate3d(0, -46px, 0); opacity: 0; }
+}
+@keyframes px-scan {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 6px; }
+}
+
+.anim-float { animation: px-float 2.4s steps(4, end) infinite; will-change: transform; }
+.anim-bounce { animation: px-bounce 0.5s ease-out; will-change: transform; }
+.anim-wilt { animation: px-wilt-sway 3.2s ease-in-out infinite; will-change: transform; }
+.anim-pop { animation: px-pop-in 0.35s ease-out both; }
+.anim-blink { animation: px-blink 4.2s infinite; transform-origin: center 62%; }
+
+/* LCD scanline overlay */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.14) 0px,
+    rgba(0, 0, 0, 0.14) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  border-radius: inherit;
+}
+
+/* Chunky stepped pixel border, pure CSS */
+.pixel-frame {
+  position: relative;
+  box-shadow:
+    0 -4px 0 0 var(--px-frame, #39442e),
+    0 4px 0 0 var(--px-frame, #39442e),
+    -4px 0 0 0 var(--px-frame, #39442e),
+    4px 0 0 0 var(--px-frame, #39442e),
+    0 -8px 0 0 var(--px-frame-dark, #12160f),
+    0 8px 0 0 var(--px-frame-dark, #12160f),
+    -8px 0 0 0 var(--px-frame-dark, #12160f),
+    8px 0 0 0 var(--px-frame-dark, #12160f),
+    -4px -4px 0 0 var(--px-frame-dark, #12160f),
+    4px -4px 0 0 var(--px-frame-dark, #12160f),
+    -4px 4px 0 0 var(--px-frame-dark, #12160f),
+    4px 4px 0 0 var(--px-frame-dark, #12160f);
+}
+
+.font-pixel { font-family: var(--font-pixel); }
+.font-lcd { font-family: var(--font-lcd); }
+
+/* Hide scrollbars on chip rows but keep them scrollable */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+button { touch-action: manipulation; }

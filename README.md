@@ -1,26 +1,78 @@
-# 🌶️ Peppergotchi
+# 🌶️ Pepper-gotchi
 
-A tamagotchi-style web app for tracking your pepper plants and seed stash. Each real plant becomes a pixel-art creature living in a classic egg-shell virtual pet device — keep it watered and watch it evolve as your real pepper grows!
+A mobile-first, retro pixel-art virtual pet that's secretly a real hot-pepper
+grow tracker. Your digital pet's health, mood, and growth stage are tied to
+how you log your real-life gardening — water the real plant, press WATER, and
+your Pepper-gotchi perks up.
 
-## Run it
+Built with **React + Tailwind CSS v4 + Lucide icons**, bundled by Vite into a
+single self-contained HTML file.
 
-Just open `index.html` in any browser — no install, no server, no dependencies. All data is saved automatically in your browser (localStorage) and never leaves your device.
+## ▶️ Run it
 
-## 🥚 My Peppers
+**No install needed:** open `dist/index.html` in any browser — everything
+(JS, CSS, pixel fonts) is inlined into that one file.
 
-- Add each pepper plant as a **pepper pal** with a name, variety, sown date, and watering interval.
-- Your pal is drawn as animated pixel art that evolves through six stages:
-  🥚 seed → 🌱 sprout → 🌿 seedling → 🪴 young plant → 🌸 flowering → 🌶️ fruiting
-- **💧 WATER** — press it whenever you water the real plant. The water bar drains over time; let it run dry and your pal wilts (x-eyes and everything).
-- **📏 MEASURE** — log heights and notes in the growth log.
-- **⬆️ Advance stage** — level your pal up whenever the real plant hits its next milestone.
-- **👋 PET** — free happiness. Your plant deserves it.
-- Track as many plants as you like and switch between them with the chips above the device.
+For development:
 
-## 🌰 Seed Vault
+```bash
+npm install
+npm run dev     # dev server with HMR
+npm run build   # rebuilds dist/index.html
+```
 
-Track seed packets with variety, seed count, source, heat level (😊 Sweet → ☠️ Nuclear), and notes. **🌱 Sow one** decrements the packet and offers to hatch it straight into a new pepper pal.
+## 🎮 The game loop
 
-## 💾 Data
+| Vital | Decay | Refill |
+|---|---|---|
+| 💧 Moisture | −15% / 24h | **Water** (+45) |
+| 🧪 Nutrition | −5% / 24h | **Feed** (+40) |
+| 💗 Attention | −10% / 24h | **Prune** (+35) / **Talk** (+15) |
 
-Export/import a JSON backup from the Data tab to move between devices or keep your peppers safe.
+- **Status effects:** Moisture at 0 → `WILTED` (x-eyes, desaturated droop).
+  Nutrition at 0 → `PALE` (washed out). All vitals above 70 → `THRIVING!`
+  (glow, blush, sparkles).
+- **Growth stages:** Seed → Sprout → Vegetative → Flowering → Fruiting →
+  Harvest Ready. Every care action earns XP; your pet auto-evolves as
+  thresholds are crossed.
+- **Delta-time background calculus:** on load, the elapsed time since
+  `lastTick` is computed and the correct decay is deducted — leave for three
+  days and you'll come back to a genuinely thirsty pepper.
+
+## 🖥️ Views
+
+1. **Garden Dashboard** — the active pet on an LCD screen (scanlines
+   included) with animated segmented vital meters, status badge, XP progress,
+   care buttons, and a care log.
+2. **Plant Manager** — track multiple live plants with days-old counters,
+   variety, mini vital strips, edit/delete.
+3. **Seed Vault** — inventory of seed packets: variety, source/brand, harvest
+   year, quantity, and a 1–5 flame heat rating. **Germinate** decrements the
+   packet and hatches a level-0 pet straight into the garden.
+
+## 🎨 Pixel art & performance notes
+
+- **Zero image files.** Every sprite is a palette-letter grid in
+  `src/pixel/sprites.js`, run-length merged into crisp SVG `<rect>` spans with
+  `shape-rendering: crispEdges` and `image-rendering: pixelated`.
+- The pet's kawaii face lives on the terracotta pot and is drawn
+  procedurally, so every growth stage has personality and moods (happy /
+  neutral / meh / sad) are swappable without new art.
+- All idle motion (float, wilt sway, blink, sparkle) is CSS `@keyframes` —
+  GPU-composited transforms, no JS animation loops.
+- State persists to `localStorage` on every change; the heartbeat tick runs
+  once a minute and on tab-visibility changes.
+
+## 🗂️ Code map
+
+```
+src/
+  game/constants.js   game rules: stages, decay rates, actions, XP
+  game/engine.js      pure logic: reducer, decay, status, XP/evolution
+  game/storage.js     localStorage load/save + offline catch-up
+  pixel/sprites.js    pixel-art grids + palette (the "asset files")
+  pixel/PixelSprite.jsx  crisp SVG sprite renderer w/ faces & status FX
+  components/         VitalMeter, StatusBadge, ActionButton, HeatRating, Modal
+  views/              GardenDashboard, PlantManager, SeedVault
+  App.jsx             state wiring, tick loop, tabs, toasts
+```
