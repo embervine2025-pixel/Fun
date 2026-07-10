@@ -3,6 +3,7 @@ import { CalendarDays, Pencil, Plus, Sprout, Trash2 } from "lucide-react";
 import PixelSprite from "../pixel/PixelSprite.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 import { STAGES, VITALS } from "../game/constants.js";
 import { daysOld, statusOf } from "../game/engine.js";
 
@@ -10,6 +11,7 @@ const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0 };
 
 export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
   const [form, setForm] = useState(null); // null | {id?, ...emptyForm}
+  const [toDelete, setToDelete] = useState(null);
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target ? e.target.value : e }));
 
@@ -50,8 +52,8 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
   };
 
   const remove = (p) => {
-    if (!confirm(`Remove ${p.name}? Its logs go with it.`)) return;
     dispatch({ type: "DELETE_PLANT", plantId: p.id });
+    setToDelete(null);
     notify("👋 Farewell, little pepper");
   };
 
@@ -112,18 +114,28 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
                   ))}
                 </div>
               </div>
-              <div className="flex flex-col gap-2 shrink-0">
-                <button onClick={() => openEdit(p)} aria-label="Edit" className="text-bone/50 hover:text-bone">
-                  <Pencil size={16} />
+              <div className="flex flex-col justify-between shrink-0 -m-1">
+                <button onClick={() => openEdit(p)} aria-label="Edit" className="p-2.5 text-bone/50 hover:text-bone">
+                  <Pencil size={17} />
                 </button>
-                <button onClick={() => remove(p)} aria-label="Delete" className="text-habanero/70 hover:text-habanero">
-                  <Trash2 size={16} />
+                <button onClick={() => setToDelete(p)} aria-label="Delete" className="p-2.5 text-habanero/70 hover:text-habanero">
+                  <Trash2 size={17} />
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {toDelete && (
+        <ConfirmDialog
+          title="REMOVE PLANT?"
+          message={`${toDelete.name} and its ${toDelete.logs.length} log entries will be gone forever.`}
+          confirmLabel="REMOVE"
+          onConfirm={() => remove(toDelete)}
+          onCancel={() => setToDelete(null)}
+        />
+      )}
 
       {form && (
         <Modal title={form.id ? "EDIT PLANT" : "NEW PLANT"} onClose={() => setForm(null)}>

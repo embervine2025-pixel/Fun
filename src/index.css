@@ -49,6 +49,13 @@ body {
   color: var(--color-bone);
   font-family: var(--font-lcd);
   overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* game UI should feel like an app: no accidental text selection on controls */
+button {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Razor-sharp pixel rendering everywhere sprites appear */
@@ -87,8 +94,8 @@ svg.pixelated {
   100% { transform: scale(1); opacity: 1; }
 }
 @keyframes px-toast-in {
-  0% { transform: translate3d(-50%, 24px, 0); opacity: 0; }
-  100% { transform: translate3d(-50%, 0, 0); opacity: 1; }
+  0% { transform: translate3d(0, 16px, 0); opacity: 0; }
+  100% { transform: translate3d(0, 0, 0); opacity: 1; }
 }
 @keyframes px-particle-rise {
   0% { transform: translate3d(0, 0, 0); opacity: 1; }

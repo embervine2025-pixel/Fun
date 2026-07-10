@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Archive, Minus, Plus, Sprout, Trash2 } from "lucide-react";
 import HeatRating from "../components/HeatRating.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
 
 const emptyForm = {
   variety: "",
@@ -15,6 +16,7 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
   const [form, setForm] = useState(null);
   const [germinating, setGerminating] = useState(null); // seed being germinated
   const [petName, setPetName] = useState("");
+  const [toDelete, setToDelete] = useState(null);
 
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
@@ -33,8 +35,9 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
     dispatch({ type: "UPDATE_SEED", seedId: seed.id, patch: { qty: seed.qty + delta } });
 
   const remove = (seed) => {
-    if (!confirm(`Discard the ${seed.variety} packet?`)) return;
     dispatch({ type: "DELETE_SEED", seedId: seed.id });
+    setToDelete(null);
+    notify("🗑️ Packet discarded");
   };
 
   const germinate = () => {
@@ -89,26 +92,26 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
                 </div>
                 <HeatRating value={s.heat} />
               </div>
-              <div className="flex items-center justify-between mt-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-y-3 mt-2.5">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => bumpQty(s, -1)}
                     aria-label="One less seed"
-                    className="w-7 h-7 grid place-items-center bg-lcd border-2 border-bark-deep text-bone"
+                    className="w-9 h-9 grid place-items-center bg-lcd border-2 border-bark-deep text-bone active:translate-y-[1px]"
                   >
-                    <Minus size={13} />
+                    <Minus size={15} />
                   </button>
                   <span className="font-pixel text-[10px] w-10 text-center text-sun">{s.qty}</span>
                   <button
                     onClick={() => bumpQty(s, 1)}
                     aria-label="One more seed"
-                    className="w-7 h-7 grid place-items-center bg-lcd border-2 border-bark-deep text-bone"
+                    className="w-9 h-9 grid place-items-center bg-lcd border-2 border-bark-deep text-bone active:translate-y-[1px]"
                   >
-                    <Plus size={13} />
+                    <Plus size={15} />
                   </button>
                   <span className="font-lcd text-lg text-bone/50">seeds</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <PixelButton
                     onClick={() => {
                       if (s.qty <= 0) return notify("Packet is empty! 😢");
@@ -119,8 +122,8 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
                     <Sprout size={11} className="inline -mt-0.5 mr-1" />
                     GERMINATE
                   </PixelButton>
-                  <button onClick={() => remove(s)} aria-label="Delete packet" className="text-habanero/70 hover:text-habanero">
-                    <Trash2 size={16} />
+                  <button onClick={() => setToDelete(s)} aria-label="Delete packet" className="p-2.5 text-habanero/70 hover:text-habanero">
+                    <Trash2 size={17} />
                   </button>
                 </div>
               </div>
@@ -128,6 +131,16 @@ export default function SeedVault({ state, dispatch, notify, onGoGarden }) {
           </div>
         ))}
       </div>
+
+      {toDelete && (
+        <ConfirmDialog
+          title="DISCARD PACKET?"
+          message={`The ${toDelete.variety} packet (${toDelete.qty} seeds) will be removed from the vault.`}
+          confirmLabel="DISCARD"
+          onConfirm={() => remove(toDelete)}
+          onCancel={() => setToDelete(null)}
+        />
+      )}
 
       {form && (
         <Modal title="DEPOSIT SEEDS" onClose={() => setForm(null)}>

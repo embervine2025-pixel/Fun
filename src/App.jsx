@@ -94,12 +94,13 @@ export default function App() {
 
       {/* toast */}
       {toast && (
-        <div
-          className="fixed left-1/2 bottom-24 z-50 -translate-x-1/2 bg-bark-deep border-2 border-foliage
-                     px-4 py-2 font-lcd text-xl whitespace-nowrap max-w-[92vw] overflow-hidden text-ellipsis"
-          style={{ animation: "px-toast-in .25s ease-out both" }}
-        >
-          {toast}
+        <div className="fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 pointer-events-none">
+          <div
+            className="bg-bark-deep border-2 border-foliage px-4 py-2 font-lcd text-xl text-center break-words max-w-full"
+            style={{ animation: "px-toast-in .25s ease-out both" }}
+          >
+            {toast}
+          </div>
         </div>
       )}
     </div>

@@ -8,7 +8,10 @@ export default function VitalMeter({ icon: Icon, label, value, color }) {
       <div className="flex-1">
         <div className="flex justify-between font-pixel text-[8px] mb-1 tracking-wider">
           <span className="text-bone/80">{label.toUpperCase()}</span>
-          <span style={{ color: danger ? "var(--color-habanero)" : color }}>
+          <span
+            className="tabular-nums"
+            style={{ color: danger ? "var(--color-habanero)" : color }}
+          >
             {Math.round(value)}%
           </span>
         </div>

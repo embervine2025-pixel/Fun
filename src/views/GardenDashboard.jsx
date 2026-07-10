@@ -82,7 +82,7 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
           <button
             key={p.id}
             onClick={() => dispatch({ type: "SET_ACTIVE", plantId: p.id })}
-            className={`shrink-0 font-pixel text-[8px] px-3 py-2 border-2 border-bark-deep tracking-wide ${
+            className={`shrink-0 font-pixel text-[8px] px-3.5 py-2.5 border-2 border-bark-deep tracking-wide ${
               p.id === plant.id ? "bg-foliage text-bark" : "bg-bark-card text-bone/70"
             }`}
           >
@@ -107,7 +107,11 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
           </div>
 
           <div key={pulse} className={`flex justify-center py-2 ${pulse ? "anim-bounce" : ""}`}>
-            <PixelSprite stageIndex={plant.stageIndex} status={status} size={216} />
+            <PixelSprite
+              stageIndex={plant.stageIndex}
+              status={status}
+              size={Math.min(216, Math.round(window.innerWidth * 0.56))}
+            />
           </div>
 
           {/* stage + growth progress */}
@@ -156,9 +160,9 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
           {plant.logs.slice(0, 6).map((entry, i) => (
             <li
               key={entry.ts + "-" + i}
-              className="flex justify-between gap-3 bg-bark-card border-2 border-bark-edge px-3 py-1.5 font-lcd text-lg"
+              className="flex justify-between items-start gap-3 bg-bark-card border-2 border-bark-edge px-3 py-1.5 font-lcd text-lg"
             >
-              <span className="truncate">{entry.text}</span>
+              <span className="break-words min-w-0">{entry.text}</span>
               <span className="text-bone/40 shrink-0">
                 {new Date(entry.ts).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </span>
