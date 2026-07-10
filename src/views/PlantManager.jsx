@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { CalendarDays, Pencil, Plus, Sprout, Trash2 } from "lucide-react";
+import { CalendarDays, Pencil, Plus, Ruler, Sprout, Trash2 } from "lucide-react";
 import PixelSprite from "../pixel/PixelSprite.jsx";
-import StatusBadge from "../components/StatusBadge.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import { CARE_TYPES, STAGES } from "../game/constants.js";
-import { carePct, daysOld, statusOf } from "../game/engine.js";
+import { STAGES } from "../game/constants.js";
+import { daysOld, growth, latestHeight } from "../game/engine.js";
 
-const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0, waterEvery: 3 };
+const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0, notes: "" };
 
 export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
   const [form, setForm] = useState(null); // null | {id?, ...emptyForm}
@@ -24,8 +23,8 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
       name: p.name,
       variety: p.variety,
       planted: new Date(p.plantedAt).toISOString().slice(0, 10),
-      stageIndex: p.stageIndex,
-      waterEvery: p.intervals.water,
+      stageIndex: growth(p).stageIndex,
+      notes: p.notes || "",
     });
 
   const submit = () => {
@@ -34,9 +33,7 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
       ? new Date(form.planted + "T12:00:00").getTime()
       : Date.now();
     const stageIndex = Number(form.stageIndex) || 0;
-    const waterEvery = Math.max(1, Math.min(30, Number(form.waterEvery) || 3));
     if (form.id) {
-      const prev = state.plants.find((p) => p.id === form.id);
       dispatch({
         type: "UPDATE_PLANT",
         plantId: form.id,
@@ -45,7 +42,7 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
           variety: form.variety.trim(),
           plantedAt,
           stageIndex,
-          intervals: { ...prev.intervals, water: waterEvery },
+          notes: form.notes.trim(),
         },
       });
       notify("✏️ Plant updated");
@@ -57,7 +54,7 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
           variety: form.variety,
           plantedAt,
           stageIndex,
-          waterEveryDays: waterEvery,
+          notes: form.notes,
         },
       });
       notify("🌱 Now tracking " + form.name.trim() + "!");
@@ -92,7 +89,8 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
 
       <div className="space-y-3">
         {state.plants.map((p) => {
-          const status = statusOf(p);
+          const g = growth(p);
+          const height = latestHeight(p);
           return (
             <div key={p.id} className="bg-bark-card border-2 border-bark-edge p-3 flex gap-3">
               <button
@@ -100,33 +98,35 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
                   dispatch({ type: "SET_ACTIVE", plantId: p.id });
                   onGoGarden();
                 }}
-                aria-label={`Open ${p.name} in garden`}
+                aria-label={`Open ${p.name}`}
                 className="shrink-0 bg-lcd border-2 border-bark-deep p-1"
               >
-                <PixelSprite stageIndex={p.stageIndex} status={status} size={76} animate={false} />
+                <PixelSprite stageIndex={g.stageIndex} variety={p.variety} size={76} animate={false} />
               </button>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-pixel text-[9px] truncate">{p.name.toUpperCase()}</span>
-                  <StatusBadge status={status} />
+                  <span className="font-pixel text-[7px] px-1.5 py-1 border-2 border-bark-deep bg-lcd text-foliage-neon tracking-wider shrink-0">
+                    {g.stage.label.toUpperCase()}
+                  </span>
                 </div>
                 <div className="font-lcd text-lg text-bone/60 leading-snug mt-0.5">
                   <Sprout size={13} className="inline mr-1 text-foliage" aria-hidden />
-                  {p.variety} · {STAGES[p.stageIndex].label}
+                  {p.variety}
                   <br />
                   <CalendarDays size={13} className="inline mr-1 text-bone/40" aria-hidden />
-                  {daysOld(p)} days old · {p.logs.length} log entries
+                  {daysOld(p)} days old
+                  {height != null && (
+                    <>
+                      {" · "}
+                      <Ruler size={13} className="inline mr-1 text-aqua" aria-hidden />
+                      {height} cm
+                    </>
+                  )}
                 </div>
-                {/* mini care-freshness strip */}
-                <div className="flex gap-1 mt-1.5">
-                  {CARE_TYPES.map((c) => (
-                    <div key={c.key} className="flex-1 h-1.5 bg-lcd overflow-hidden">
-                      <div
-                        className="h-full"
-                        style={{ width: `${carePct(p, c.key)}%`, backgroundColor: c.color }}
-                      />
-                    </div>
-                  ))}
+                {/* growth-to-next-stage strip */}
+                <div className="h-1.5 bg-lcd overflow-hidden mt-1.5">
+                  <div className="h-full bg-sun" style={{ width: `${g.pct}%` }} />
                 </div>
               </div>
               <div className="flex flex-col justify-between shrink-0 -m-1">
@@ -145,7 +145,7 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
       {toDelete && (
         <ConfirmDialog
           title="REMOVE PLANT?"
-          message={`${toDelete.name} and its ${toDelete.logs.length} log entries will be gone forever.`}
+          message={`${toDelete.name} and its ${toDelete.logs.length} journal entries will be gone forever.`}
           confirmLabel="REMOVE"
           onConfirm={() => remove(toDelete)}
           onCancel={() => setToDelete(null)}
@@ -158,13 +158,13 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
             <input className={inputCls} value={form.name} onChange={set("name")} placeholder="Hacienda Habanero" />
           </Field>
           <Field label="Variety / species">
-            <input className={inputCls} value={form.variety} onChange={set("variety")} placeholder="Capsicum chinense" />
+            <input className={inputCls} value={form.variety} onChange={set("variety")} placeholder="Habanero Orange" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Planted on">
               <input type="date" className={inputCls} value={form.planted} onChange={set("planted")} />
             </Field>
-            <Field label="Growth stage">
+            <Field label="Current stage">
               <select className={inputCls} value={form.stageIndex} onChange={set("stageIndex")}>
                 {STAGES.map((s, i) => (
                   <option key={s.key} value={i}>{s.label}</option>
@@ -172,8 +172,8 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
               </select>
             </Field>
           </div>
-          <Field label="Water every (days)">
-            <input type="number" min="1" max="30" className={inputCls} value={form.waterEvery} onChange={set("waterEvery")} />
+          <Field label="Notes (location, soil, source…)">
+            <input className={inputCls} value={form.notes} onChange={set("notes")} placeholder="south window, 5 gal pot" />
           </Field>
           <PixelButton className="w-full mt-1" onClick={submit}>
             {form.id ? "SAVE CHANGES" : "START TRACKING"}

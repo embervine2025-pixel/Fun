@@ -1,23 +1,19 @@
 // Crisp SVG pixel-sprite renderer for the composed pepper plants.
-// - run-length merged <rect> spans (few DOM nodes, fast paints)
-// - shape-rendering="crispEdges" + image-rendering: pixelated
-// - status is conveyed botanically: healthy glow, pale desaturation,
-//   wilted droop-and-sway — no cartoon faces.
+// The pod shape and color come from the plant's variety name, so a
+// habanero grows orange lanterns and a reaper grows gnarly pods.
 import { useMemo } from "react";
-import { GRID, STAGE_SPRITES, STATUS_FX, rowSpans } from "./sprites.js";
+import { GRID, getPodStyle, getStageSprites, rowSpans } from "./sprites.js";
 
 export default function PixelSprite({
   stageIndex = 0,
-  status = "stable",
+  variety = "",
   size = 240,
   animate = true,
   className = "",
 }) {
-  const grid = STAGE_SPRITES[Math.min(stageIndex, STAGE_SPRITES.length - 1)];
-  const fx = STATUS_FX[status] || STATUS_FX.stable;
-
-  // Memoize the rect spans — grids are static per stage.
   const rects = useMemo(() => {
+    const grids = getStageSprites(getPodStyle(variety));
+    const grid = grids[Math.min(stageIndex, grids.length - 1)];
     const out = [];
     grid.forEach((row, y) => {
       for (const [x, w, color] of rowSpans(row)) {
@@ -25,18 +21,12 @@ export default function PixelSprite({
       }
     });
     return out;
-  }, [grid]);
-
-  const motionClass = !animate
-    ? ""
-    : status === "wilted"
-      ? "anim-wilt"
-      : "anim-float";
+  }, [stageIndex, variety]);
 
   return (
     <div
-      className={`pixelated ${motionClass} ${className}`}
-      style={{ width: size, height: size, filter: fx.filter }}
+      className={`pixelated ${animate ? "anim-float" : ""} ${className}`}
+      style={{ width: size, height: size }}
     >
       <svg
         viewBox={`0 0 ${GRID} ${GRID}`}
@@ -46,13 +36,11 @@ export default function PixelSprite({
         className="pixelated"
         aria-hidden="true"
       >
-        <g transform={fx.plantTransform || undefined}>
-          {rects.map((r, i) => (
-            <rect key={i} x={r.x} y={r.y} width={r.w} height={1.02} fill={r.color} />
-          ))}
-        </g>
-        {/* subtle sparkle when the plant is thriving or harvest-ready */}
-        {(status === "thriving" || stageIndex === 5) && (
+        {rects.map((r, i) => (
+          <rect key={i} x={r.x} y={r.y} width={r.w} height={1.02} fill={r.color} />
+        ))}
+        {/* a little sparkle once the plant is harvest ready */}
+        {stageIndex === 5 && (
           <g fill="#ffd93b">
             <rect x={3} y={4} width={0.9} height={0.9} style={{ animation: "px-sparkle 1.6s infinite" }} />
             <rect x={27} y={7} width={0.9} height={0.9} style={{ animation: "px-sparkle 1.6s .5s infinite" }} />
