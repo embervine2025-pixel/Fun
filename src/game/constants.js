@@ -1,54 +1,63 @@
 // ---------------------------------------------------------------
-// Pepper-gotchi game rules: growth stages, vital decay, care moves
+// Pepper-gotchi rules, v3 — a real-care tracker with a living plant.
+//
+// Meters are no longer arcade numbers: each one is derived from the
+// timestamp of the last real-world care action vs. that plant's
+// schedule. The bar hits 0 at 1.5x the interval (the grace window).
 // ---------------------------------------------------------------
 
 export const HOUR = 60 * 60 * 1000;
 export const DAY = 24 * HOUR;
+export const GRACE = 1.5; // meter is empty at interval * GRACE
 
-// Vital decay in % per 24h
-export const DECAY_PER_DAY = {
-  moisture: 15,
-  nutrition: 5,
-  attention: 10,
-};
-
-export const VITALS = [
-  { key: "moisture", label: "Moisture", color: "var(--color-aqua)" },
-  { key: "nutrition", label: "Nutrition", color: "var(--color-mango)" },
-  { key: "attention", label: "Attention", color: "var(--color-orchid)" },
+export const CARE_TYPES = [
+  {
+    key: "water",
+    label: "Water",
+    past: "watered",
+    meterLabel: "Moisture",
+    defaultIntervalDays: 3,
+    color: "var(--color-aqua)",
+    log: "Watered 💧",
+  },
+  {
+    key: "feed",
+    label: "Feed",
+    past: "fed",
+    meterLabel: "Nutrition",
+    defaultIntervalDays: 14,
+    color: "var(--color-mango)",
+    log: "Fed nutrients 🧪",
+  },
+  {
+    key: "prune",
+    label: "Prune",
+    past: "pruned",
+    meterLabel: "Upkeep",
+    defaultIntervalDays: 7,
+    color: "var(--color-orchid)",
+    log: "Pruned & tidied ✂️",
+  },
 ];
 
+export const DEFAULT_INTERVALS = Object.fromEntries(
+  CARE_TYPES.map((c) => [c.key, c.defaultIntervalDays])
+);
+
+// Growth stages mirror the real plant. typicalDays is only a hint —
+// the app suggests advancing after that long, but you decide.
 export const STAGES = [
-  { key: "seed", label: "Seed", xpToNext: 40 },
-  { key: "sprout", label: "Sprout", xpToNext: 100 },
-  { key: "vegetative", label: "Vegetative", xpToNext: 190 },
-  { key: "flowering", label: "Flowering", xpToNext: 300 },
-  { key: "fruiting", label: "Fruiting", xpToNext: 440 },
-  { key: "harvest", label: "Harvest Ready", xpToNext: Infinity },
+  { key: "seed", label: "Seed", typicalDays: 10 },
+  { key: "sprout", label: "Sprout", typicalDays: 14 },
+  { key: "vegetative", label: "Vegetative", typicalDays: 28 },
+  { key: "flowering", label: "Flowering", typicalDays: 21 },
+  { key: "fruiting", label: "Fruiting", typicalDays: 30 },
+  { key: "harvest", label: "Harvest Ready", typicalDays: Infinity },
 ];
-
-// Care actions: which vital they refill, by how much, and XP earned
-export const ACTIONS = {
-  water: { label: "Water", vital: "moisture", amount: 45, xp: 10, log: "Watered 💧" },
-  feed: { label: "Feed", vital: "nutrition", amount: 40, xp: 14, log: "Fed nutrients 🧪" },
-  prune: { label: "Prune", vital: "attention", amount: 35, xp: 12, log: "Pruned & tidied ✂️" },
-  talk: { label: "Talk", vital: "attention", amount: 15, xp: 5, log: "Had a chat 💬" },
-};
-
-export const LOG_PROGRESS_XP = 20;
 
 export const STATUS = {
-  wilted: { label: "WILTED", tone: "danger", face: "sad" },
-  pale: { label: "PALE", tone: "warn", face: "meh" },
-  thriving: { label: "THRIVING!", tone: "great", face: "happy" },
-  stable: { label: "STABLE", tone: "ok", face: "neutral" },
+  wilted: { label: "NEEDS WATER!", tone: "danger" },
+  pale: { label: "FEED ME", tone: "warn" },
+  thriving: { label: "THRIVING!", tone: "great" },
+  stable: { label: "ON TRACK", tone: "ok" },
 };
-
-export const TALK_LINES = [
-  "You're doing great, little one!",
-  "Grow big and spicy!",
-  "Who's the hottest pepper? You are!",
-  "Photosynthesize like you mean it!",
-  "One day you'll be salsa. The good kind.",
-  "Scoville dreams, my friend.",
-];

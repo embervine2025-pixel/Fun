@@ -4,10 +4,10 @@ import PixelSprite from "../pixel/PixelSprite.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
-import { STAGES, VITALS } from "../game/constants.js";
-import { daysOld, statusOf } from "../game/engine.js";
+import { CARE_TYPES, STAGES } from "../game/constants.js";
+import { carePct, daysOld, statusOf } from "../game/engine.js";
 
-const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0 };
+const emptyForm = { name: "", variety: "", planted: "", stageIndex: 0, waterEvery: 3 };
 
 export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
   const [form, setForm] = useState(null); // null | {id?, ...emptyForm}
@@ -25,6 +25,7 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
       variety: p.variety,
       planted: new Date(p.plantedAt).toISOString().slice(0, 10),
       stageIndex: p.stageIndex,
+      waterEvery: p.intervals.water,
     });
 
   const submit = () => {
@@ -33,19 +34,33 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
       ? new Date(form.planted + "T12:00:00").getTime()
       : Date.now();
     const stageIndex = Number(form.stageIndex) || 0;
+    const waterEvery = Math.max(1, Math.min(30, Number(form.waterEvery) || 3));
     if (form.id) {
+      const prev = state.plants.find((p) => p.id === form.id);
       dispatch({
         type: "UPDATE_PLANT",
         plantId: form.id,
-        patch: { name: form.name.trim(), variety: form.variety.trim(), plantedAt, stageIndex },
+        patch: {
+          name: form.name.trim(),
+          variety: form.variety.trim(),
+          plantedAt,
+          stageIndex,
+          intervals: { ...prev.intervals, water: waterEvery },
+        },
       });
       notify("✏️ Plant updated");
     } else {
       dispatch({
         type: "ADD_PLANT",
-        plant: { name: form.name, variety: form.variety, plantedAt, stageIndex },
+        plant: {
+          name: form.name,
+          variety: form.variety,
+          plantedAt,
+          stageIndex,
+          waterEveryDays: waterEvery,
+        },
       });
-      notify("🌱 New Pepper-gotchi spawned!");
+      notify("🌱 Now tracking " + form.name.trim() + "!");
       onGoGarden();
     }
     setForm(null);
@@ -102,13 +117,13 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
                   <CalendarDays size={13} className="inline mr-1 text-bone/40" aria-hidden />
                   {daysOld(p)} days old · {p.logs.length} log entries
                 </div>
-                {/* mini vitals strip */}
+                {/* mini care-freshness strip */}
                 <div className="flex gap-1 mt-1.5">
-                  {VITALS.map((v) => (
-                    <div key={v.key} className="flex-1 h-1.5 bg-lcd overflow-hidden">
+                  {CARE_TYPES.map((c) => (
+                    <div key={c.key} className="flex-1 h-1.5 bg-lcd overflow-hidden">
                       <div
                         className="h-full"
-                        style={{ width: `${p.vitals[v.key]}%`, backgroundColor: v.color }}
+                        style={{ width: `${carePct(p, c.key)}%`, backgroundColor: c.color }}
                       />
                     </div>
                   ))}
@@ -157,8 +172,11 @@ export default function PlantManager({ state, dispatch, notify, onGoGarden }) {
               </select>
             </Field>
           </div>
+          <Field label="Water every (days)">
+            <input type="number" min="1" max="30" className={inputCls} value={form.waterEvery} onChange={set("waterEvery")} />
+          </Field>
           <PixelButton className="w-full mt-1" onClick={submit}>
-            {form.id ? "SAVE CHANGES" : "SPAWN PEPPER-GOTCHI"}
+            {form.id ? "SAVE CHANGES" : "START TRACKING"}
           </PixelButton>
         </Modal>
       )}

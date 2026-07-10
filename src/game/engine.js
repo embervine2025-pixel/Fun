@@ -1,14 +1,9 @@
 // ---------------------------------------------------------------
-// Core business logic: pure functions + the global state reducer.
-// No React imports here — fully testable in isolation.
+// Core logic: pure functions + the global state reducer.
+// Everything is derived from real timestamps, so "decay" needs no
+// background ticks — reading the state at time T gives the truth.
 // ---------------------------------------------------------------
-import {
-  ACTIONS,
-  DAY,
-  DECAY_PER_DAY,
-  LOG_PROGRESS_XP,
-  STAGES,
-} from "./constants.js";
+import { CARE_TYPES, DAY, DEFAULT_INTERVALS, GRACE, STAGES } from "./constants.js";
 
 export const clamp = (v, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, v));
 export const uid = () =>
@@ -17,22 +12,70 @@ export const uid = () =>
 export const daysOld = (plant, now = Date.now()) =>
   Math.max(0, Math.floor((now - plant.plantedAt) / DAY));
 
-export function statusOf(plant) {
-  const { moisture, nutrition, attention } = plant.vitals;
-  if (moisture <= 0) return "wilted";
-  if (nutrition <= 0) return "pale";
-  if (moisture > 70 && nutrition > 70 && attention > 70) return "thriving";
-  return "stable";
+export const daysSince = (ts, now = Date.now()) => (now - ts) / DAY;
+
+/* ---------- derived care state ---------- */
+
+// Meter %: full right after care, empty at interval * GRACE days.
+export function carePct(plant, key, now = Date.now()) {
+  const interval = plant.intervals[key] || DEFAULT_INTERVALS[key];
+  return clamp(
+    Math.round(100 * (1 - daysSince(plant.care[key], now) / (interval * GRACE)))
+  );
 }
 
-export function stageProgress(plant) {
+// Days until this care is due (negative = overdue).
+export function dueInDays(plant, key, now = Date.now()) {
+  const interval = plant.intervals[key] || DEFAULT_INTERVALS[key];
+  return interval - daysSince(plant.care[key], now);
+}
+
+export function dueText(plant, key, now = Date.now()) {
+  const d = dueInDays(plant, key, now);
+  if (d <= -1) return `overdue ${Math.floor(-d)}d!`;
+  if (d <= 0) return "due today";
+  if (d <= 1) return "due tomorrow";
+  return `due in ${Math.ceil(d)}d`;
+}
+
+export function statusOf(plant, now = Date.now()) {
+  if (carePct(plant, "water", now) <= 0) return "wilted";
+  if (carePct(plant, "feed", now) <= 0) return "pale";
+  const allFresh = CARE_TYPES.every((c) => carePct(plant, c.key, now) >= 70);
+  return allFresh ? "thriving" : "stable";
+}
+
+/* ---------- growth stage (manual, with a hint) ---------- */
+
+export function daysInStage(plant, now = Date.now()) {
+  return Math.floor(daysSince(plant.stageChangedAt || plant.plantedAt, now));
+}
+
+export function stageHint(plant, now = Date.now()) {
   const stage = STAGES[plant.stageIndex];
-  if (!isFinite(stage.xpToNext)) return 100;
-  const prev = plant.stageIndex === 0 ? 0 : STAGES[plant.stageIndex - 1].xpToNext;
-  return clamp(Math.round(((plant.xp - prev) / (stage.xpToNext - prev)) * 100));
+  const days = daysInStage(plant, now);
+  return {
+    days,
+    typical: stage.typicalDays,
+    pct: isFinite(stage.typicalDays)
+      ? clamp(Math.round((days / stage.typicalDays) * 100))
+      : 100,
+    readyToAdvance:
+      isFinite(stage.typicalDays) &&
+      days >= stage.typicalDays &&
+      plant.stageIndex < STAGES.length - 1,
+  };
 }
 
-export function createPlant({ name, variety, plantedAt, stageIndex = 0 }) {
+// Latest logged height, if any.
+export function latestHeight(plant) {
+  const entry = plant.logs.find((e) => e.height != null);
+  return entry ? entry.height : null;
+}
+
+/* ---------- factories ---------- */
+
+export function createPlant({ name, variety, plantedAt, stageIndex = 0, waterEveryDays }) {
   const now = Date.now();
   return {
     id: uid(),
@@ -40,10 +83,13 @@ export function createPlant({ name, variety, plantedAt, stageIndex = 0 }) {
     variety: (variety || "Mystery Pepper").trim(),
     plantedAt: plantedAt || now,
     stageIndex,
-    xp: stageIndex === 0 ? 0 : STAGES[stageIndex - 1].xpToNext,
-    vitals: { moisture: 100, nutrition: 100, attention: 100 },
-    lastTick: now,
-    logs: [{ ts: now, text: "🥚 A new Pepper-gotchi is born!" }],
+    stageChangedAt: now,
+    intervals: {
+      ...DEFAULT_INTERVALS,
+      ...(waterEveryDays ? { water: waterEveryDays } : {}),
+    },
+    care: { water: now, feed: now, prune: now },
+    logs: [{ ts: now, text: "🌱 Tracking started" }],
   };
 }
 
@@ -59,36 +105,8 @@ export function createSeed({ variety, source, year, qty, heat }) {
   };
 }
 
-// Delta-time decay: deduct vitals for the hours elapsed since lastTick.
-export function decayPlant(plant, now = Date.now()) {
-  const hours = (now - plant.lastTick) / (DAY / 24);
-  if (hours <= 0.005) return plant; // < ~20s elapsed, skip churn
-  const vitals = { ...plant.vitals };
-  for (const key of Object.keys(DECAY_PER_DAY)) {
-    vitals[key] = clamp(vitals[key] - (DECAY_PER_DAY[key] * hours) / 24);
-  }
-  return { ...plant, vitals, lastTick: now };
-}
-
-function addLog(plant, text, now) {
-  return { ...plant, logs: [{ ts: now, text }, ...plant.logs].slice(0, 60) };
-}
-
-// Grant XP and auto-evolve through stages whose threshold is crossed.
-function grantXp(plant, xp, now) {
-  let p = { ...plant, xp: plant.xp + xp };
-  while (
-    p.stageIndex < STAGES.length - 1 &&
-    p.xp >= STAGES[p.stageIndex].xpToNext
-  ) {
-    p = addLog(
-      { ...p, stageIndex: p.stageIndex + 1 },
-      `🎉 Evolved into ${STAGES[p.stageIndex + 1].label}!`,
-      now
-    );
-    p.evolvedAt = now; // lets the UI play a celebration
-  }
-  return p;
+function addLog(plant, entry) {
+  return { ...plant, logs: [entry, ...plant.logs].slice(0, 80) };
 }
 
 export const initialState = {
@@ -103,38 +121,42 @@ const mapPlant = (state, id, fn) => ({
   plants: state.plants.map((p) => (p.id === id ? fn(p) : p)),
 });
 
+/* ---------- reducer ---------- */
+
 export function reducer(state, action) {
   const now = action.now || Date.now();
   switch (action.type) {
-    case "TICK":
-      return {
-        ...state,
-        plants: state.plants.map((p) => decayPlant(p, now)),
-      };
-
     case "CARE": {
-      const spec = ACTIONS[action.action];
+      const spec = CARE_TYPES.find((c) => c.key === action.care);
       if (!spec) return state;
-      return mapPlant(state, action.plantId, (plant) => {
-        let p = decayPlant(plant, now);
-        p = {
-          ...p,
-          vitals: {
-            ...p.vitals,
-            [spec.vital]: clamp(p.vitals[spec.vital] + spec.amount),
-          },
-        };
-        p = addLog(p, spec.log, now);
-        return grantXp(p, spec.xp, now);
-      });
+      return mapPlant(state, action.plantId, (p) =>
+        addLog(
+          { ...p, care: { ...p.care, [spec.key]: now } },
+          { ts: now, text: spec.log }
+        )
+      );
     }
 
-    case "LOG_PROGRESS":
-      return mapPlant(state, action.plantId, (plant) => {
-        let p = decayPlant(plant, now);
-        const height = action.height ? `${action.height} cm — ` : "";
-        p = addLog(p, `📓 ${height}${action.text || "progress logged"}`, now);
-        return grantXp(p, LOG_PROGRESS_XP, now);
+    case "LOG_MEASURE": {
+      const height = action.height ? parseFloat(action.height) : null;
+      const text = action.text?.trim() || (height != null ? "measured" : "");
+      if (height == null && !text) return state;
+      return mapPlant(state, action.plantId, (p) =>
+        addLog(p, {
+          ts: now,
+          height,
+          text: `📓 ${height != null ? height + " cm" : ""}${height != null && text ? " — " : ""}${text}`,
+        })
+      );
+    }
+
+    case "SET_STAGE":
+      return mapPlant(state, action.plantId, (p) => {
+        if (action.stageIndex === p.stageIndex) return p;
+        return addLog(
+          { ...p, stageIndex: action.stageIndex, stageChangedAt: now },
+          { ts: now, text: `🌿 Entered ${STAGES[action.stageIndex].label} stage` }
+        );
       });
 
     case "ADD_PLANT": {
@@ -145,12 +167,11 @@ export function reducer(state, action) {
     case "UPDATE_PLANT":
       return mapPlant(state, action.plantId, (p) => {
         const next = { ...p, ...action.patch };
-        // Manual stage change re-anchors XP so progress bars stay sane.
-        if (action.patch.stageIndex != null && action.patch.stageIndex !== p.stageIndex) {
-          next.xp =
-            action.patch.stageIndex === 0
-              ? 0
-              : STAGES[action.patch.stageIndex - 1].xpToNext;
+        if (
+          action.patch.stageIndex != null &&
+          action.patch.stageIndex !== p.stageIndex
+        ) {
+          next.stageChangedAt = now;
         }
         return next;
       });
@@ -177,7 +198,9 @@ export function reducer(state, action) {
       return {
         ...state,
         seeds: state.seeds.map((s) =>
-          s.id === action.seedId ? { ...s, ...action.patch, qty: Math.max(0, action.patch.qty ?? s.qty) } : s
+          s.id === action.seedId
+            ? { ...s, ...action.patch, qty: Math.max(0, action.patch.qty ?? s.qty) }
+            : s
         ),
       };
 

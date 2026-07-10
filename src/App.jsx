@@ -22,12 +22,14 @@ export default function App() {
   // Offline persistence: save on every state change.
   useEffect(() => saveState(state), [state]);
 
-  // Slow heartbeat tick keeps vitals decaying while the app stays open.
+  // Meters are derived from real timestamps, so nothing "decays" in
+  // state — we just re-render once a minute (and on tab return) so the
+  // derived values stay current on screen.
+  const [, refresh] = useReducer((n) => n + 1, 0);
   useEffect(() => {
-    const id = setInterval(() => dispatch({ type: "TICK" }), 60_000);
-    // Also catch up instantly when the tab becomes visible again.
+    const id = setInterval(refresh, 60_000);
     const onVisible = () =>
-      document.visibilityState === "visible" && dispatch({ type: "TICK" });
+      document.visibilityState === "visible" && refresh();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(id);
@@ -58,7 +60,7 @@ export default function App() {
           <Flame size={14} className="inline -mt-1 text-mango" aria-hidden />
         </h1>
         <p className="font-lcd text-lg text-bone/50 mt-1">
-          raise 'em spicy · water 'em real
+          pepper grow tracker · seed vault
         </p>
       </header>
 

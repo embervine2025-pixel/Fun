@@ -1,28 +1,43 @@
 import { useMemo, useState } from "react";
 import {
+  ArrowUp,
   Droplets,
   FlaskConical,
-  Heart,
-  MessageCircle,
   NotebookPen,
+  Ruler,
   Scissors,
-  Sparkles,
 } from "lucide-react";
 import PixelSprite from "../pixel/PixelSprite.jsx";
 import VitalMeter from "../components/VitalMeter.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
-import ActionButton from "../components/ActionButton.jsx";
 import Modal, { Field, inputCls, PixelButton } from "../components/Modal.jsx";
-import { STAGES, TALK_LINES, VITALS } from "../game/constants.js";
-import { daysOld, stageProgress, statusOf } from "../game/engine.js";
+import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import { CARE_TYPES, STAGES } from "../game/constants.js";
+import {
+  carePct,
+  daysOld,
+  daysSince,
+  dueText,
+  latestHeight,
+  stageHint,
+  statusOf,
+} from "../game/engine.js";
 
-const VITAL_ICONS = { moisture: Droplets, nutrition: FlaskConical, attention: Heart };
+const CARE_ICONS = { water: Droplets, feed: FlaskConical, prune: Scissors };
+
+function agoText(ts) {
+  const d = daysSince(ts);
+  if (d < 1) return "today";
+  if (d < 2) return "yesterday";
+  return `${Math.floor(d)}d ago`;
+}
 
 export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) {
   const [logOpen, setLogOpen] = useState(false);
   const [logText, setLogText] = useState("");
   const [logHeight, setLogHeight] = useState("");
-  const [pulse, setPulse] = useState(0); // re-trigger bounce animation
+  const [advancing, setAdvancing] = useState(false);
+  const [pulse, setPulse] = useState(0);
 
   const plant = useMemo(
     () => state.plants.find((p) => p.id === state.activePlantId) || state.plants[0],
@@ -32,9 +47,9 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
   if (!plant) {
     return (
       <div className="flex flex-col items-center pt-14 px-6 text-center">
-        <PixelSprite stageIndex={0} status="stable" size={170} />
+        <PixelSprite stageIndex={2} status="stable" size={170} />
         <p className="font-pixel text-[10px] leading-6 text-bone/80 mt-6 max-w-xs">
-          YOUR GARDEN IS EMPTY! ADD A PLANT OR GERMINATE A SEED FROM THE VAULT.
+          NO PLANTS TRACKED YET. ADD ONE OR GERMINATE A SEED FROM THE VAULT.
         </p>
         <PixelButton className="mt-6" onClick={onGoPlant}>
           + ADD A PLANT
@@ -45,33 +60,32 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
 
   const status = statusOf(plant);
   const stage = STAGES[plant.stageIndex];
-  const progress = stageProgress(plant);
+  const hint = stageHint(plant);
   const age = daysOld(plant);
+  const height = latestHeight(plant);
 
-  const care = (action) => {
-    dispatch({ type: "CARE", plantId: plant.id, action });
+  const care = (key) => {
+    dispatch({ type: "CARE", plantId: plant.id, care: key });
     setPulse((n) => n + 1);
-    if (action === "talk") {
-      notify(`"${TALK_LINES[Math.floor(Math.random() * TALK_LINES.length)]}"`);
-    } else {
-      notify(
-        { water: "💧 Glug glug!", feed: "🧪 Yum, nutrients!", prune: "✂️ Fresh trim!" }[action]
-      );
-    }
+    notify(
+      { water: "💧 Watering logged", feed: "🧪 Feeding logged", prune: "✂️ Pruning logged" }[key]
+    );
   };
 
   const saveLog = () => {
     if (!logText.trim() && !logHeight) return notify("Add a note or height first!");
-    dispatch({
-      type: "LOG_PROGRESS",
-      plantId: plant.id,
-      text: logText.trim(),
-      height: logHeight,
-    });
+    dispatch({ type: "LOG_MEASURE", plantId: plant.id, text: logText, height: logHeight });
     setLogOpen(false);
     setLogText("");
     setLogHeight("");
-    notify("📓 Progress logged! +20 XP");
+    notify("📓 Entry saved");
+  };
+
+  const advanceStage = () => {
+    dispatch({ type: "SET_STAGE", plantId: plant.id, stageIndex: plant.stageIndex + 1 });
+    setAdvancing(false);
+    setPulse((n) => n + 1);
+    notify(`🌿 Now ${STAGES[plant.stageIndex + 1].label}!`);
   };
 
   return (
@@ -101,6 +115,7 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
               </div>
               <div className="font-lcd text-lg text-bone/60 leading-tight">
                 {plant.variety} · Day {age}
+                {height != null && ` · ${height} cm`}
               </div>
             </div>
             <StatusBadge status={status} />
@@ -114,50 +129,71 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
             />
           </div>
 
-          {/* stage + growth progress */}
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles size={14} className="text-sun shrink-0" aria-hidden />
-            <span className="font-pixel text-[8px] text-bone/80 tracking-wider">
+          {/* stage tracker — manual, with a typical-duration hint */}
+          <div className="flex items-center gap-2">
+            <span className="font-pixel text-[8px] text-bone/80 tracking-wider shrink-0">
               {stage.label.toUpperCase()}
             </span>
             <div className="flex-1 h-2.5 bg-lcd-lit border-2 border-bark-deep overflow-hidden">
               <div
                 className="h-full bg-sun transition-all duration-700"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${hint.pct}%` }}
               />
             </div>
-            <span className="font-pixel text-[8px] text-sun">{progress}%</span>
+            <span className="font-lcd text-base text-bone/60 shrink-0 tabular-nums">
+              day {hint.days}
+              {isFinite(hint.typical) && ` / ~${hint.typical}`}
+            </span>
           </div>
+          {hint.readyToAdvance && (
+            <button
+              onClick={() => setAdvancing(true)}
+              className="mt-2 w-full font-pixel text-[8px] tracking-wider bg-sun text-bark border-2 border-bark-deep py-2.5 active:translate-y-[2px]"
+            >
+              <ArrowUp size={11} className="inline -mt-0.5 mr-1" />
+              LOOKING BIGGER? ADVANCE TO {STAGES[plant.stageIndex + 1].label.toUpperCase()}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* vitals */}
-      <div className="mx-2 mt-7 space-y-3 bg-bark-card border-2 border-bark-edge p-4">
-        {VITALS.map((v) => (
-          <VitalMeter
-            key={v.key}
-            icon={VITAL_ICONS[v.key]}
-            label={v.label}
-            value={plant.vitals[v.key]}
-            color={v.color}
-          />
-        ))}
+      {/* care schedule — real dates drive the meters */}
+      <div className="mx-2 mt-7 bg-bark-card border-2 border-bark-edge divide-y-2 divide-bark-edge">
+        {CARE_TYPES.map((c) => {
+          const pct = carePct(plant, c.key);
+          return (
+            <div key={c.key} className="p-3.5">
+              <VitalMeter icon={CARE_ICONS[c.key]} label={c.meterLabel} value={pct} color={c.color} />
+              <div className="flex items-center justify-between mt-2 pl-6">
+                <span className="font-lcd text-lg text-bone/60">
+                  {c.past} {agoText(plant.care[c.key])} · every{" "}
+                  {plant.intervals[c.key]}d ·{" "}
+                  <span className={pct <= 20 ? "text-habanero" : "text-bone/60"}>
+                    {dueText(plant, c.key)}
+                  </span>
+                </span>
+                <PixelButton onClick={() => care(c.key)}>{c.label.toUpperCase()}</PixelButton>
+              </div>
+            </div>
+          );
+        })}
+        <div className="p-3.5 flex gap-3">
+          <PixelButton variant="ghost" className="flex-1" onClick={() => setLogOpen(true)}>
+            <Ruler size={11} className="inline -mt-0.5 mr-1.5" />
+            MEASURE
+          </PixelButton>
+          <PixelButton variant="ghost" className="flex-1" onClick={() => setLogOpen(true)}>
+            <NotebookPen size={11} className="inline -mt-0.5 mr-1.5" />
+            ADD NOTE
+          </PixelButton>
+        </div>
       </div>
 
-      {/* action bar */}
-      <div className="flex justify-around mt-5 px-1">
-        <ActionButton icon={Droplets} label="Water" color="var(--color-aqua)" onClick={() => care("water")} />
-        <ActionButton icon={FlaskConical} label="Feed" color="var(--color-mango)" onClick={() => care("feed")} />
-        <ActionButton icon={Scissors} label="Prune" color="var(--color-foliage)" onClick={() => care("prune")} />
-        <ActionButton icon={MessageCircle} label="Talk" color="var(--color-orchid)" onClick={() => care("talk")} />
-        <ActionButton icon={NotebookPen} label="Log" color="var(--color-sun)" onClick={() => setLogOpen(true)} />
-      </div>
-
-      {/* recent log */}
+      {/* journal */}
       <div className="mx-2 mt-6">
-        <h3 className="font-pixel text-[9px] text-bone/60 tracking-wider mb-2">CARE LOG</h3>
+        <h3 className="font-pixel text-[9px] text-bone/60 tracking-wider mb-2">JOURNAL</h3>
         <ul className="space-y-1.5">
-          {plant.logs.slice(0, 6).map((entry, i) => (
+          {plant.logs.slice(0, 8).map((entry, i) => (
             <li
               key={entry.ts + "-" + i}
               className="flex justify-between items-start gap-3 bg-bark-card border-2 border-bark-edge px-3 py-1.5 font-lcd text-lg"
@@ -172,7 +208,7 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
       </div>
 
       {logOpen && (
-        <Modal title="LOG PROGRESS" onClose={() => setLogOpen(false)}>
+        <Modal title="JOURNAL ENTRY" onClose={() => setLogOpen(false)}>
           <Field label="Height (cm, optional)">
             <input
               type="number"
@@ -194,9 +230,20 @@ export default function GardenDashboard({ state, dispatch, notify, onGoPlant }) 
             />
           </Field>
           <PixelButton className="w-full mt-1" onClick={saveLog}>
-            SAVE ENTRY (+20 XP)
+            SAVE ENTRY
           </PixelButton>
         </Modal>
+      )}
+
+      {advancing && (
+        <ConfirmDialog
+          title="ADVANCE STAGE?"
+          message={`Move ${plant.name} from ${stage.label} to ${STAGES[plant.stageIndex + 1].label}? Do this when the real plant has visibly progressed.`}
+          confirmLabel="ADVANCE"
+          variant="primary"
+          onConfirm={advanceStage}
+          onCancel={() => setAdvancing(false)}
+        />
       )}
     </div>
   );
